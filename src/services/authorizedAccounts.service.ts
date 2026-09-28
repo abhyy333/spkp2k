@@ -5,54 +5,49 @@ import { OWNER_EMAIL } from '../lib/authGuard';
 
 export const authorizedAccountsService = {
   /**
-   * Memeriksa apakah suatu alamat email telah diotorisasi untuk registrasi
+   * Memeriksa apakah suatu alamat email telah diotorisasi
    */
   async checkAuthorization(email: string): Promise<{
     authorized: boolean;
     role?: 'ADMIN' | 'DOSEN';
     isActive?: boolean;
+    mustChangePassword?: boolean;
     message?: string;
   }> {
     if (!isSupabaseConfigured()) {
-      return { authorized: true, role: 'ADMIN' };
+      return { authorized: true, role: 'ADMIN', isActive: true, mustChangePassword: false };
     }
 
     const cleanEmail = email.trim().toLowerCase();
     if (cleanEmail === OWNER_EMAIL.toLowerCase()) {
-      return { authorized: true, role: 'ADMIN', isActive: true };
+      return { authorized: true, role: 'ADMIN', isActive: true, mustChangePassword: false };
     }
 
     try {
-      const { data: rpcAllowed, error: rpcErr } = await supabase.rpc('can_register_authorized_account', {
-        p_email: cleanEmail,
-      });
-
-      if (rpcErr || !rpcAllowed) {
-        return {
-          authorized: false,
-          message: 'Email belum diotorisasi.',
-        };
-      }
-
       const { data, error } = await supabase
         .from('authorized_accounts')
-        .select('email, role, is_active')
+        .select('email, role, is_active, must_change_password')
         .eq('email', cleanEmail)
         .maybeSingle();
 
       if (error || !data || !data.is_active) {
         return {
           authorized: false,
-          message: 'Email belum diotorisasi.',
+          message: 'Akun ini tidak memiliki otorisasi. Silakan hubungi Administrator Jurusan.',
         };
       }
 
-      return { authorized: true, role: data.role as 'ADMIN' | 'DOSEN', isActive: true };
+      return {
+        authorized: true,
+        role: data.role as 'ADMIN' | 'DOSEN',
+        isActive: true,
+        mustChangePassword: Boolean(data.must_change_password),
+      };
     } catch (err: any) {
       console.warn('Exception during authorization check:', err);
       return {
         authorized: false,
-        message: 'Email belum diotorisasi.',
+        message: 'Gagal memeriksa status otorisasi akun.',
       };
     }
   },
@@ -75,6 +70,7 @@ export const authorizedAccountsService = {
           user_id,
           is_active,
           is_system_owner,
+          must_change_password,
           created_by,
           created_at,
           updated_at,
@@ -124,6 +120,7 @@ export const authorizedAccountsService = {
           user_id: row.user_id || null,
           is_active: Boolean(row.is_active),
           is_system_owner: isOwner,
+          must_change_password: Boolean(row.must_change_password),
           created_by: row.created_by || null,
           created_at: row.created_at,
           updated_at: row.updated_at,
@@ -150,158 +147,129 @@ export const authorizedAccountsService = {
   },
 
   /**
-   * Menambahkan email baru sebagai ADMIN
+   * MEMBUAT AKUN BARU SERVER-SIDE OLEH ADMIN
+   * Menghasilkan kata sandi sementara yang hanya ditampilkan sekali
    */
-  async addAdmin(email: string): Promise<AuthorizedAccount> {
+  async createAccount(payload: {
+    email: string;
+    role: 'ADMIN' | 'DOSEN';
+    lecturerId?: string | null;
+    fullName?: string;
+  }): Promise<{
+    email: string;
+    temporaryPassword: string;
+    userId: string;
+  }> {
     if (!isSupabaseConfigured()) {
       throw new Error('Koneksi database belum dikonfigurasi.');
     }
 
-    const cleanEmail = email.trim().toLowerCase();
+    const cleanEmail = payload.email.trim().toLowerCase();
     if (!cleanEmail || !cleanEmail.includes('@')) {
       throw new Error('Format alamat email tidak valid.');
     }
 
-    // Check if email already exists
-    const { data: existing } = await supabase
-      .from('authorized_accounts')
-      .select('email, role, is_active')
-      .eq('email', cleanEmail)
-      .maybeSingle();
+    if (payload.role === 'DOSEN' && !payload.lecturerId) {
+      throw new Error('Dosen pengampu wajib dipilih.');
+    }
 
-    if (existing) {
-      if (existing.role === 'ADMIN') {
-        if (!existing.is_active) {
-          // Reactivate if inactive
-          const { data: updated, error: updateErr } = await supabase
-            .from('authorized_accounts')
-            .update({ is_active: true, updated_at: new Date().toISOString() })
-            .eq('email', cleanEmail)
-            .select(`
-              email,
-              role,
-              lecturer_id,
-              user_id,
-              is_active,
-              is_system_owner,
-              created_by,
-              created_at,
-              updated_at,
-              claimed_at
-            `)
-            .single();
-          if (updateErr) throw new Error(parseSupabaseError(updateErr));
-          return updated;
-        }
-        throw new Error(`Email ${cleanEmail} sudah terdaftar sebagai Administrator.`);
+    const { data, error } = await supabase.rpc('admin_create_account', {
+      p_email: cleanEmail,
+      p_role: payload.role,
+      p_lecturer_id: payload.lecturerId || null,
+      p_full_name: payload.fullName || null,
+    });
+
+    if (error) {
+      let msg = error.message || '';
+      if (msg.includes('EMAIL_ALREADY_EXISTS')) {
+        msg = `Email ${cleanEmail} sudah terdaftar dengan akun aktif.`;
+      } else if (msg.includes('LECTURER_ALREADY_LINKED')) {
+        msg = 'Dosen tersebut sudah memiliki akun terdaftar.';
+      } else if (msg.includes('LECTURER_REQUIRED')) {
+        msg = 'Dosen pengampu wajib dipilih untuk akun Dosen.';
       } else {
-        throw new Error(`Email ${cleanEmail} sudah terdaftar dengan role ${existing.role}. Ubah atau hapus otorisasi sebelumnya terlebih dahulu.`);
+        msg = parseSupabaseError(error);
       }
+      throw new Error(msg);
     }
 
-    const payload = {
-      email: cleanEmail,
-      role: 'ADMIN',
-      lecturer_id: null,
-      is_active: true,
+    return {
+      email: data.email || cleanEmail,
+      temporaryPassword: data.temporary_password,
+      userId: data.user_id,
     };
-
-    const { data, error } = await supabase
-      .from('authorized_accounts')
-      .insert(payload)
-      .select(`
-        email,
-        role,
-        lecturer_id,
-        user_id,
-        is_active,
-        is_system_owner,
-        created_by,
-        created_at,
-        updated_at,
-        claimed_at
-      `)
-      .single();
-
-    if (error) {
-      throw new Error(parseSupabaseError(error));
-    }
-
-    return data;
   },
 
   /**
-   * Mendaftarkan akun email untuk Dosen tertentu
+   * RESET KATA SANDI SERVER-SIDE OLEH ADMIN
+   * Menghasilkan kata sandi sementara baru dan mewajibkan ganti sandi saat login
    */
-  async addLecturerAccount(email: string, lecturerId: string): Promise<AuthorizedAccount> {
+  async resetPassword(targetEmail: string): Promise<{
+    email: string;
+    temporaryPassword: string;
+  }> {
     if (!isSupabaseConfigured()) {
       throw new Error('Koneksi database belum dikonfigurasi.');
     }
 
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      throw new Error('Format alamat email tidak valid.');
+    const cleanEmail = targetEmail.trim().toLowerCase();
+    if (!cleanEmail) {
+      throw new Error('Alamat email wajib diisi.');
     }
 
-    if (!lecturerId) {
-      throw new Error('Dosen wajib dipilih.');
-    }
-
-    // Rule: Satu Dosen Satu Akun!
-    const { data: existingLecturerAccount } = await supabase
-      .from('authorized_accounts')
-      .select('email, role, is_active')
-      .eq('lecturer_id', lecturerId)
-      .maybeSingle();
-
-    if (existingLecturerAccount) {
-      throw new Error(`Dosen ini sudah terhubung dengan akun otorisasi (${existingLecturerAccount.email}).`);
-    }
-
-    // Check if email already used by another authorization
-    const { data: existingEmailAccount } = await supabase
-      .from('authorized_accounts')
-      .select('email, role')
-      .eq('email', cleanEmail)
-      .maybeSingle();
-
-    if (existingEmailAccount) {
-      throw new Error(`Email ${cleanEmail} sudah terdaftar sebagai ${existingEmailAccount.role}.`);
-    }
-
-    const payload = {
-      email: cleanEmail,
-      role: 'DOSEN',
-      lecturer_id: lecturerId,
-      is_active: true,
-    };
-
-    const { data, error } = await supabase
-      .from('authorized_accounts')
-      .insert(payload)
-      .select(`
-        email,
-        role,
-        lecturer_id,
-        user_id,
-        is_active,
-        is_system_owner,
-        created_by,
-        created_at,
-        updated_at,
-        claimed_at
-      `)
-      .single();
+    const { data, error } = await supabase.rpc('admin_reset_password', {
+      p_target_email: cleanEmail,
+    });
 
     if (error) {
-      throw new Error(parseSupabaseError(error));
+      let msg = error.message || '';
+      if (msg.includes('USER_NOT_FOUND')) {
+        msg = `Akun untuk ${cleanEmail} belum dibuat di sistem.`;
+      } else {
+        msg = parseSupabaseError(error);
+      }
+      throw new Error(msg);
     }
 
-    return data;
+    return {
+      email: data.email || cleanEmail,
+      temporaryPassword: data.temporary_password,
+    };
   },
 
   /**
-   * Mengubah status aktif / nonaktif akun otorisasi berdasarkan email (Primary Key)
+   * SELESAIKAN GANTI KATA SANDI MANDATORI
+   */
+  async completePasswordChange(): Promise<void> {
+    if (!isSupabaseConfigured()) return;
+    const { error } = await supabase.rpc('complete_password_change');
+    if (error) {
+      console.warn('complete_password_change error:', error);
+    }
+  },
+
+  /**
+   * Backward compatibility helpers for adding admin / lecturer
+   */
+  async addAdmin(email: string, fullName?: string) {
+    return this.createAccount({
+      email,
+      role: 'ADMIN',
+      fullName,
+    });
+  },
+
+  async addLecturerAccount(email: string, lecturerId: string) {
+    return this.createAccount({
+      email,
+      role: 'DOSEN',
+      lecturerId,
+    });
+  },
+
+  /**
+   * Mengubah status aktif / nonaktif akun otorisasi berdasarkan email
    */
   async setStatus(email: string, isActive: boolean, isSystemOwner?: boolean): Promise<void> {
     if (!isSupabaseConfigured()) {
@@ -328,7 +296,7 @@ export const authorizedAccountsService = {
   },
 
   /**
-   * Menghapus record otorisasi berdasarkan email (Primary Key)
+   * Menghapus record otorisasi berdasarkan email
    */
   async deleteAuthorizedAccount(email: string, isSystemOwner?: boolean): Promise<void> {
     if (!isSupabaseConfigured()) {

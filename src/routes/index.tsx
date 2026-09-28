@@ -85,10 +85,10 @@ export const AppRoutes: React.FC = () => {
     <Routes>
       {/* Public Auth Routes */}
       <Route path="/auth" element={<AuthPage />} />
-      <Route path="/login" element={<AuthPage defaultTab="login" />} />
-      <Route path="/register" element={<AuthPage defaultTab="register" />} />
+      <Route path="/login" element={<AuthPage />} />
+      <Route path="/register" element={<Navigate to="/login" replace />} />
       <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
+      <Route path="/reset-password" element={<ForgotPasswordPage />} />
       <Route path="/403" element={<ForbiddenPage />} />
 
       {/* Root redirect */}

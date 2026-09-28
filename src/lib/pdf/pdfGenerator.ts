@@ -19,6 +19,22 @@ const DAY_ORDER: Record<string, number> = {
   minggu: 7,
 };
 
+async function loadLogoDataUrl(): Promise<string | null> {
+  try {
+    const res = await fetch('/logo-unram.png');
+    if (!res.ok) return null;
+    const blob = await res.blob();
+    return new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result as string);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Generates and downloads official Academic Lecture Schedule PDF
  */
@@ -27,6 +43,8 @@ export async function generateLectureSchedulePDF(
   term: AcademicTerm | null,
   options: PDFExportOptions = { scope: 'ALL' }
 ): Promise<void> {
+  const logoDataUrl = await loadLogoDataUrl();
+
   // 1. Initialize jsPDF in A4 Landscape
   const doc = new jsPDF({
     orientation: 'landscape',
@@ -62,6 +80,12 @@ export async function generateLectureSchedulePDF(
   // 4. Header Drawing
   const drawHeader = (data: any) => {
     if (data.pageNumber === 1) {
+      if (logoDataUrl) {
+        try {
+          doc.addImage(logoDataUrl, 'PNG', margin, 10, 20, 20);
+        } catch {}
+      }
+
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(13);
       doc.setTextColor(20, 30, 50);

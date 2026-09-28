@@ -389,17 +389,19 @@ export const AppleWeeklyCalendar: React.FC<AppleWeeklyCalendarProps> = React.mem
             gridTemplateRows: `48px repeat(${sessions.length}, minmax(44px, auto))`,
           }}
         >
-          {/* Top-Left Empty Header Cell */}
+          {/* Top-Left Header Cell: Waktu */}
           <div
-            className="sticky top-0 z-30 flex items-center justify-center border-b border-slate-200/60"
+            className="sticky top-0 z-30 flex items-center justify-center border-b border-slate-200/60 font-bold text-xs text-slate-700 select-none"
             style={{
               gridColumn: 1,
               gridRow: 1,
-              background: 'rgba(255, 255, 255, 0.85)',
+              background: 'rgba(255, 255, 255, 0.95)',
             }}
-          />
+          >
+            Waktu
+          </div>
 
-          {/* Day Headers (Senin, Selasa, etc. with exact dates and blue circle on active day) */}
+          {/* Day Headers (SENIN, SELASA, etc. with exact dates e.g. 28 Sep 2026) */}
           {dayLanesData.map((day) => {
             const isSelected =
               selectedDate.getFullYear() === day.dateObj.getFullYear() &&
@@ -415,6 +417,8 @@ export const AppleWeeklyCalendar: React.FC<AppleWeeklyCalendarProps> = React.mem
               );
             })();
 
+            const fullDateLabel = `${day.dateObj.getDate()} ${monthNames[day.dateObj.getMonth()]} ${day.dateObj.getFullYear()}`;
+
             return (
               <div
                 key={`day-header-${day.name}`}
@@ -423,37 +427,31 @@ export const AppleWeeklyCalendar: React.FC<AppleWeeklyCalendarProps> = React.mem
                 tabIndex={0}
                 className={cn(
                   'sticky top-0 z-30 p-2 sm:p-2.5 flex flex-col items-center justify-center text-center border-b border-slate-200/60 cursor-pointer transition-colors group select-none',
-                  isSelected ? 'bg-blue-50/40' : 'hover:bg-slate-50/50'
+                  isSelected ? 'bg-blue-50/60 text-blue-900' : 'hover:bg-slate-50/50 text-slate-800'
                 )}
                 style={{
                   gridColumn: `${day.startCol} / span ${day.laneCount}`,
                   gridRow: 1,
-                  background: isSelected ? 'rgba(239, 246, 255, 0.85)' : 'rgba(255, 255, 255, 0.85)',
+                  background: isSelected ? 'rgba(239, 246, 255, 0.95)' : 'rgba(255, 255, 255, 0.95)',
                 }}
               >
                 <span
                   className={cn(
-                    'text-3xs font-bold uppercase tracking-wider transition-colors',
-                    isSelected ? 'text-blue-600' : 'text-slate-400 group-hover:text-slate-700'
+                    'text-xs font-extrabold uppercase tracking-wider transition-colors',
+                    isSelected ? 'text-blue-700' : 'text-slate-700 group-hover:text-blue-600'
                   )}
                 >
                   {day.name}
                 </span>
 
-                <div className="mt-1 flex items-center justify-center">
-                  <span
-                    className={cn(
-                      'w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center transition-all',
-                      isSelected
-                        ? 'bg-blue-600 text-white shadow-xs shadow-blue-500/30 ring-2 ring-blue-400/20'
-                        : isToday
-                        ? 'bg-blue-100 text-blue-700'
-                        : 'text-slate-800 group-hover:bg-slate-100'
-                    )}
-                  >
-                    {day.dateObj.getDate()}
-                  </span>
-                </div>
+                <span
+                  className={cn(
+                    'text-2xs font-medium mt-0.5 transition-colors',
+                    isSelected ? 'text-blue-600 font-semibold' : 'text-slate-500'
+                  )}
+                >
+                  {fullDateLabel}
+                </span>
               </div>
             );
           })}
@@ -550,12 +548,23 @@ export const AppleWeeklyCalendar: React.FC<AppleWeeklyCalendarProps> = React.mem
                   <AppleScheduleCard
                     data={item}
                     onClick={() => onSelectEntry && onSelectEntry(item)}
+                    onReschedule={(cardData) => onSelectEntry && onSelectEntry(cardData)}
                     style={{ height: '100%' }}
                   />
                 </div>
               );
             })
           )}
+        </div>
+      </div>
+
+      {/* Bottom Summary Bar matching Screenshot */}
+      <div className="pt-4 border-t border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-2 text-2xs font-semibold text-slate-500">
+        <div>
+          Menampilkan <span className="text-slate-800 font-bold">{entries.length}</span> dari <span className="text-slate-800 font-bold">{entries.length}</span> total kelas terjadwal
+        </div>
+        <div>
+          Jurusan Teknik Elektro — Universitas Mataram
         </div>
       </div>
     </div>

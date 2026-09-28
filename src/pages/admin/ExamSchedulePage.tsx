@@ -813,25 +813,26 @@ export const ExamSchedulePage: React.FC = () => {
                 : "Kelola penyusunan dan publikasi jadwal Ujian Tengah Semester dan Ujian Akhir Semester."
             }
             actions={
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 {isAdmin && !isGuest && (
                   <>
                     <button
                       type="button"
                       onClick={() => setIsHistoryModalOpen(true)}
-                      className="inline-flex items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-colors shadow-2xs cursor-pointer"
+                      className="inline-flex items-center gap-1.5 sm:gap-2 px-2.5 sm:px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-colors shadow-2xs cursor-pointer"
                     >
                       <History className="w-4 h-4 text-purple-600" />
-                      Riwayat Versi
+                      <span className="hidden sm:inline">Riwayat Versi</span>
+                      <span className="sm:hidden">Riwayat</span>
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleStartWorkflow(examType)}
-                      className="inline-flex items-center gap-2 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-xs cursor-pointer"
+                      className="inline-flex items-center gap-1.5 sm:gap-2 px-3 sm:px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-xs cursor-pointer"
                     >
                       <Sparkles className="w-4 h-4" />
-                      Susun Jadwal {examType}
+                      <span>Susun Jadwal {examType}</span>
                     </button>
 
                     {/* Tarik Jadwal (Admin Only) */}
@@ -839,11 +840,11 @@ export const ExamSchedulePage: React.FC = () => {
                       <button
                         type="button"
                         onClick={() => setShowClearModal(true)}
-                        className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors shadow-2xs cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl transition-colors shadow-2xs cursor-pointer"
                         title={`Tarik jadwal resmi ${examType} yang sedang aktif`}
                       >
                         <EyeOff className="w-4 h-4 text-rose-600" />
-                        <span>Tarik Jadwal</span>
+                        <span>Tarik</span>
                       </button>
                     )}
                   </>
@@ -855,12 +856,12 @@ export const ExamSchedulePage: React.FC = () => {
                   disabled={isGeneratingPDF || publishedExams.length === 0}
                   onClick={handleQuickDownloadPDF}
                   title={publishedExams.length === 0 ? `Jadwal ${examType} belum diterbitkan.` : `Unduh PDF Jadwal ${examType} Resmi`}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
                 >
                   {isGeneratingPDF ? (
                     <>
                       <Loader2 className="w-4 h-4 text-blue-600 animate-spin" />
-                      <span>Membuat PDF...</span>
+                      <span className="hidden sm:inline">Membuat PDF...</span>
                     </>
                   ) : (
                     <>
@@ -876,7 +877,7 @@ export const ExamSchedulePage: React.FC = () => {
                   disabled={publishedExams.length === 0}
                   onClick={() => setIsExportModalOpen(true)}
                   title={publishedExams.length === 0 ? `Jadwal ${examType} belum diterbitkan.` : `Cetak Dokumen Jadwal ${examType}`}
-                  className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200/90 rounded-xl transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
                 >
                   <Printer className="w-4 h-4 text-slate-400" />
                   <span>Cetak</span>
@@ -1107,57 +1108,133 @@ export const ExamSchedulePage: React.FC = () => {
             )}
 
             {!loadingPublished && !publishedError && publishedExams.length > 0 && (
-              <div className="overflow-x-auto">
-                <table className="w-full text-xs text-left">
-                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-2xs">
-                    <tr>
-                      <th className="py-3 px-4 w-12 text-center">No</th>
-                      <th className="py-3 px-4">Tanggal Pelaksanaan</th>
-                      <th className="py-3 px-4">Waktu Ujian</th>
-                      <th className="py-3 px-4">Mata Kuliah</th>
-                      <th className="py-3 px-3 text-center">Kelas</th>
-                      <th className="py-3 px-4">Ruangan</th>
-                      <th className="py-3 px-4">Dosen Pengawas</th>
-                      <th className="py-3 px-3 text-center">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredPublishedExams.map((item, idx) => (
-                      <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
-                        <td className="py-3 px-4 text-center text-slate-400">{idx + 1}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">
-                          {formatDateIndo(item.date || item.exam_date || '')}
-                        </td>
-                        <td className="py-3 px-4 font-mono font-medium text-slate-700">
-                          {item.start_time} – {item.end_time}
-                        </td>
-                        <td className="py-3 px-4">
-                          <p className="font-bold text-slate-900">{item.course_name}</p>
-                          <span className="text-2xs font-mono text-slate-400">
-                            {item.course_code}
-                          </span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 text-2xs">
-                            {item.class_name || item.class_code || 'A'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 font-semibold text-slate-800">
-                          {item.room_name || item.room_code || 'R. Ujian'}
-                        </td>
-                        <td className="py-3 px-4 text-slate-700">
-                          {item.proctor_names ||
-                            (item.supervisor_names && item.supervisor_names.join(', ')) ||
-                            'Tim Dosen Pengawas'}
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <StatusBadge label={item.status || 'Terjadwal'} />
-                        </td>
+              <>
+                {/* Desktop Table View (>= 640px) */}
+                <div className="hidden sm:block overflow-x-auto border border-slate-200 rounded-xl">
+                  <table className="w-full text-xs text-left">
+                    <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-semibold uppercase tracking-wider text-2xs">
+                      <tr>
+                        <th className="py-3 px-4 w-12 text-center">No</th>
+                        <th className="py-3 px-4">Tanggal Pelaksanaan</th>
+                        <th className="py-3 px-4">Waktu Ujian</th>
+                        <th className="py-3 px-4">Mata Kuliah</th>
+                        <th className="py-3 px-3 text-center">Kelas</th>
+                        <th className="py-3 px-4">Ruangan</th>
+                        <th className="py-3 px-4">Dosen Pengawas</th>
+                        <th className="py-3 px-3 text-center">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {filteredPublishedExams.map((item, idx) => (
+                        <tr key={idx} className="hover:bg-blue-50/40 transition-colors">
+                          <td className="py-3 px-4 text-center text-slate-400">{idx + 1}</td>
+                          <td className="py-3 px-4 font-bold text-slate-900">
+                            {formatDateIndo(item.date || item.exam_date || '')}
+                          </td>
+                          <td className="py-3 px-4 font-mono font-medium text-slate-700">
+                            {item.start_time} – {item.end_time}
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-bold text-slate-900">{item.course_name}</p>
+                            <span className="text-2xs font-mono text-slate-400">
+                              {item.course_code}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 text-2xs">
+                              {item.class_name || item.class_code || 'A'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 font-semibold text-slate-800">
+                            {item.room_name || item.room_code || 'R. Ujian'}
+                          </td>
+                          <td className="py-3 px-4 text-slate-700">
+                            {item.proctor_names ||
+                              (item.supervisor_names && item.supervisor_names.join(', ')) ||
+                              'Tim Dosen Pengawas'}
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <StatusBadge label={item.status || 'Terjadwal'} />
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Mobile Card List View (< 640px) grouped by Date */}
+                <div className="block sm:hidden space-y-4">
+                  {filteredPublishedExams.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400 text-xs bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                      Tidak ada jadwal ujian yang memenuhi kriteria filter.
+                    </div>
+                  ) : (
+                    (() => {
+                      const dateGroups: { [date: string]: typeof filteredPublishedExams } = {};
+                      filteredPublishedExams.forEach((item) => {
+                        const d = item.date || item.exam_date || 'Lainnya';
+                        if (!dateGroups[d]) dateGroups[d] = [];
+                        dateGroups[d].push(item);
+                      });
+
+                      const sortedDates = Object.keys(dateGroups).sort();
+
+                      return sortedDates.map((dateKey) => (
+                        <div key={dateKey} className="space-y-2">
+                          <div className="flex items-center justify-between px-1">
+                            <span className="text-2xs font-extrabold uppercase tracking-wider text-purple-700 bg-purple-50 px-2.5 py-1 rounded-md border border-purple-200/60">
+                              {dateKey !== 'Lainnya' ? formatDateIndo(dateKey) : 'Tanggal Tidak Ditentukan'}
+                            </span>
+                            <span className="text-2xs font-semibold text-slate-400">
+                              {dateGroups[dateKey].length} Ujian
+                            </span>
+                          </div>
+                          <div className="space-y-2.5">
+                            {dateGroups[dateKey].map((item, idx) => (
+                              <div
+                                key={item.id || idx}
+                                className="bg-white rounded-xl border border-slate-200/90 p-3 shadow-2xs space-y-2"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div className="min-w-0 flex-1">
+                                    <h4 className="text-xs font-bold text-slate-900 leading-snug break-words">
+                                      {item.course_name}
+                                    </h4>
+                                    <span className="text-2xs font-mono text-slate-500">
+                                      {item.course_code}
+                                    </span>
+                                  </div>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-800 text-2xs shrink-0">
+                                    Kelas {item.class_name || item.class_code || 'A'}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs font-medium text-slate-600 border-y border-slate-100 py-1.5">
+                                  <span className="flex items-center gap-1 font-mono font-semibold text-slate-800">
+                                    <Clock className="w-3 h-3 text-blue-600 shrink-0" />
+                                    {item.start_time} – {item.end_time}
+                                  </span>
+                                  <span className="flex items-center gap-1 font-semibold text-slate-800">
+                                    <DoorClosed className="w-3 h-3 text-purple-600 shrink-0" />
+                                    {item.room_name || item.room_code || 'R. Ujian'}
+                                  </span>
+                                </div>
+
+                                <div className="text-2xs text-slate-500 leading-snug break-words">
+                                  <span className="font-semibold text-slate-600">Pengawas: </span>
+                                  {item.proctor_names ||
+                                    (item.supervisor_names && item.supervisor_names.join(', ')) ||
+                                    'Tim Dosen Pengawas'}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ));
+                    })()
+                  )}
+                </div>
+              </>
             )}
           </div>
         </>

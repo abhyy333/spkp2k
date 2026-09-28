@@ -21,6 +21,7 @@ export interface AuthContextType {
   effectiveRole: UserRole | null;
   effectiveAccessMode: 'ADMIN' | 'DOSEN' | 'GUEST';
   authStatus: AuthStatus;
+  mustChangePassword: boolean;
   isOwnerAdmin: boolean;
   isSystemOwner: boolean;
   isAdmin: boolean;
@@ -32,7 +33,7 @@ export interface AuthContextType {
   setPreviewRole: (role: SystemPreviewRole | null) => void;
   exitPreview: () => void;
   loading: boolean;
-  signIn: (email: string, password: string) => Promise<{ error?: string; role?: UserRole; isOwner?: boolean }>;
+  signIn: (email: string, password: string) => Promise<{ error?: string; role?: UserRole; isOwner?: boolean; mustChangePassword?: boolean }>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ error?: string; isConfirmationRequired?: boolean; user?: User | null }>;
   resetPassword: (email: string) => Promise<{ error?: string; success?: boolean }>;
   updatePassword: (password: string) => Promise<{ error?: string; success?: boolean }>;
@@ -45,6 +46,7 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [mustChangePassword, setMustChangePassword] = useState<boolean>(false);
   const [previewRole, setPreviewRoleState] = useState<SystemPreviewRole | null>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_PREVIEW_ROLE_KEY);
@@ -71,8 +73,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const isDosen = actualRole === 'DOSEN';
   const isMahasiswa = false;
 
-  // Effective access mode (Decoupled from actual database role)
-  // When previewRole === 'GUEST', effectiveAccessMode is 'GUEST', but user and actualRole remain intact!
+  // Effective access mode
   const effectiveAccessMode: 'ADMIN' | 'DOSEN' | 'GUEST' =
     isOwnerAdmin && previewRole === 'GUEST'
       ? 'GUEST'
@@ -113,9 +114,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setPreviewRoleState(null);
       try {
         localStorage.removeItem(STORAGE_PREVIEW_ROLE_KEY);
-      } catch {
-        // ignore
-      }
+      } catch {}
       return;
     }
 
@@ -123,9 +122,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setPreviewRoleState(null);
       try {
         localStorage.removeItem(STORAGE_PREVIEW_ROLE_KEY);
-      } catch {
-        // ignore
-      }
+      } catch {}
       return;
     }
 
@@ -133,39 +130,15 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       setPreviewRoleState(newRole);
       try {
         localStorage.setItem(STORAGE_PREVIEW_ROLE_KEY, newRole);
-      } catch {
-        // ignore
-      }
+      } catch {}
     }
   };
 
-  // Exit preview mode back to authoritative admin view
   const exitPreview = () => {
     setPreviewRoleState(null);
     try {
       localStorage.removeItem(STORAGE_PREVIEW_ROLE_KEY);
-    } catch {
-      // ignore
-    }
-  };
-
-  // Profile cache helpers
-  const getCachedProfile = (userId: string): Profile | null => {
-    try {
-      const raw = localStorage.getItem(`spk_profile_cache_${userId}`);
-      if (raw) return JSON.parse(raw);
-    } catch {
-      // ignore
-    }
-    return null;
-  };
-
-  const setCachedProfile = (userId: string, prof: Profile) => {
-    try {
-      localStorage.setItem(`spk_profile_cache_${userId}`, JSON.stringify(prof));
-    } catch {
-      // ignore
-    }
+    } catch {}
   };
 
   // Fetch and strictly validate user profile and authorization
@@ -187,6 +160,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         updated_at: new Date().toISOString(),
       };
       setProfile(fallbackProfile);
+      setMustChangePassword(false);
       return fallbackProfile;
     }
 
@@ -194,7 +168,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       const email = (currentUser.email || '').trim().toLowerCase();
 
       if (!isOwner) {
-        // 1. Check authorized_accounts authorization
+        // 1. Check authorized_accounts authorization & must_change_password flag
         const { data: authAcc, error: accErr } = await supabase
           .from('authorized_accounts')
           .select('*')
@@ -205,8 +179,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
           await supabase.auth.signOut();
           setUser(null);
           setProfile(null);
+          setMustChangePassword(false);
           setAuthStatus('UNAUTHENTICATED');
-          toast.error('Akun ini tidak memiliki akses ke sistem. Silakan gunakan Public View atau hubungi Administrator Jurusan.');
+          toast.error('Akun Anda tidak aktif. Hubungi Administrator Jurusan.');
           return null;
         }
 
@@ -216,6 +191,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
             .update({ user_id: currentUser.id, claimed_at: new Date().toISOString() })
             .eq('email', email);
         }
+
+        setMustChangePassword(Boolean(authAcc.must_change_password));
+      } else {
+        setMustChangePassword(false);
       }
 
       // 2. Fetch profile from profiles table
@@ -229,8 +208,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         await supabase.auth.signOut();
         setUser(null);
         setProfile(null);
+        setMustChangePassword(false);
         setAuthStatus('UNAUTHENTICATED');
-        toast.error('Akun ini tidak memiliki akses ke sistem. Silakan gunakan Public View atau hubungi Administrator Jurusan.');
+        toast.error('Akun ini tidak memiliki akses ke sistem. Hubungi Administrator Jurusan.');
         return null;
       }
 
@@ -246,8 +226,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
+      setMustChangePassword(false);
       setAuthStatus('UNAUTHENTICATED');
-      toast.error('Akun ini tidak memiliki akses ke sistem. Silakan gunakan Public View atau hubungi Administrator Jurusan.');
+      toast.error('Gagal memverifikasi hak akses akun.');
       return null;
     }
   };
@@ -263,10 +244,9 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
     let authResolved = false;
 
-    // 1. Single Auth State Change Subscription
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session: Session | null) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session: Session | null) => {
       if (!mounted) return;
       authResolved = true;
 
@@ -279,13 +259,13 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
       } else {
         setUser(null);
         setProfile(null);
+        setMustChangePassword(false);
         if (mounted) {
           setAuthStatus('UNAUTHENTICATED');
         }
       }
     });
 
-    // 2. Safe initial fallback in case onAuthStateChange is delayed
     supabase.auth
       .getSession()
       .then(async ({ data: { session } }) => {
@@ -325,10 +305,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const signIn = async (
     email: string,
     password: string
-  ): Promise<{ error?: string; role?: UserRole; isOwner?: boolean }> => {
+  ): Promise<{ error?: string; role?: UserRole; isOwner?: boolean; mustChangePassword?: boolean }> => {
     if (!isSupabaseConfigured()) {
       return {
-        error: 'Koneksi database belum dikonfigurasi. Tambahkan Supabase URL dan Publishable Key.',
+        error: 'Koneksi database belum dikonfigurasi.',
       };
     }
 
@@ -342,132 +322,52 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (error) {
         setAuthStatus('UNAUTHENTICATED');
-        return { error: error.message };
-      }
-
-      if (!data.user) {
-        setAuthStatus('UNAUTHENTICATED');
-        return { error: 'Gagal melakukan otentikasi. Silakan periksa kembali email dan password.' };
-      }
-
-      setUser(data.user);
-      const prof = await fetchProfile(data.user);
-      const isOwner = cleanEmail === OWNER_EMAIL && prof?.role === 'ADMIN';
-
-      // Clear any previous GUEST preview when logging in cleanly
-      setPreviewRoleState(null);
-      try {
-        localStorage.removeItem(STORAGE_PREVIEW_ROLE_KEY);
-      } catch {
-        // ignore
-      }
-
-      setAuthStatus('AUTHENTICATED');
-      return { role: prof?.role, isOwner };
-    } catch (err: any) {
-      setAuthStatus('UNAUTHENTICATED');
-      return { error: err.message || 'Terjadi kesalahan sistem saat proses login.' };
-    }
-  };
-
-  const signUp = async (
-    email: string,
-    password: string,
-    fullName: string
-  ): Promise<{ error?: string; isConfirmationRequired?: boolean; user?: User | null }> => {
-    if (!isSupabaseConfigured()) {
-      return {
-        error: 'Koneksi database belum dikonfigurasi. Tambahkan Supabase URL dan Publishable Key.',
-      };
-    }
-
-    try {
-      setAuthStatus('INITIALIZING');
-      const cleanEmail = email.trim().toLowerCase();
-      const cleanName = fullName.trim();
-
-      const { data: rpcAllowed, error: rpcErr } = await supabase.rpc('can_register_authorized_account', {
-        p_email: cleanEmail,
-      });
-
-      if (rpcErr || !rpcAllowed) {
-        setAuthStatus('UNAUTHENTICATED');
-        return {
-          error: 'Email belum diotorisasi.',
-        };
-      }
-
-      const { data, error } = await supabase.auth.signUp({
-        email: cleanEmail,
-        password,
-        options: {
-          data: {
-            full_name: cleanName,
-            name: cleanName,
-          },
-        },
-      });
-
-      if (error) {
-        setAuthStatus('UNAUTHENTICATED');
-        let errMsg = error.message || '';
-        if (errMsg.includes('REGISTRATION_NOT_AUTHORIZED') || errMsg.includes('not authorized')) {
-          errMsg = 'Email ini belum diotorisasi oleh Administrator Jurusan.';
-        } else if (errMsg.includes('LECTURER_LINK_REQUIRED')) {
-          errMsg = 'Akun dosen belum terhubung dengan Master Data Dosen. Hubungi Administrator Jurusan.';
-        } else if (errMsg.includes('AUTHORIZED_ACCOUNT_ALREADY_CLAIMED')) {
-          errMsg = 'Akun ini sudah pernah didaftarkan. Silakan masuk atau gunakan pemulihan kata sandi.';
-        } else if (errMsg.includes('LECTURER_ALREADY_LINKED_TO_ANOTHER_ACCOUNT')) {
-          errMsg = 'Profil dosen sudah terhubung dengan akun lain.';
-        } else {
-          errMsg = 'Email belum diotorisasi.';
+        let errMsg = 'Email atau kata sandi tidak sesuai.';
+        if (error.message.includes('Email not confirmed')) {
+          errMsg = 'Email belum dikonfirmasi.';
         }
         return { error: errMsg };
       }
 
-      if (data.user) {
-        if (data.session) {
-          setUser(data.user);
-          await fetchProfile(data.user);
-          setAuthStatus('AUTHENTICATED');
-          return { user: data.user, isConfirmationRequired: false };
-        } else {
-          setAuthStatus('UNAUTHENTICATED');
-          return { user: data.user, isConfirmationRequired: true };
-        }
+      if (!data.user) {
+        setAuthStatus('UNAUTHENTICATED');
+        return { error: 'Email atau kata sandi tidak sesuai.' };
       }
 
-      setAuthStatus('UNAUTHENTICATED');
-      return { error: 'Gagal membuat akun. Silakan coba lagi.' };
+      setUser(data.user);
+      const prof = await fetchProfile(data.user);
+      if (!prof) {
+        setAuthStatus('UNAUTHENTICATED');
+        return { error: 'Akun Anda tidak aktif. Hubungi Administrator Jurusan.' };
+      }
+
+      const isOwner = cleanEmail === OWNER_EMAIL && prof?.role === 'ADMIN';
+
+      setPreviewRoleState(null);
+      try {
+        localStorage.removeItem(STORAGE_PREVIEW_ROLE_KEY);
+      } catch {}
+
+      setAuthStatus('AUTHENTICATED');
+      return { role: prof?.role, isOwner, mustChangePassword };
     } catch (err: any) {
       setAuthStatus('UNAUTHENTICATED');
-      return { error: err.message || 'Terjadi kesalahan sistem saat proses pendaftaran.' };
+      return { error: 'Email atau kata sandi tidak sesuai.' };
     }
   };
 
-  const resetPassword = async (email: string): Promise<{ error?: string; success?: boolean }> => {
-    if (!isSupabaseConfigured()) {
-      return {
-        error: 'Koneksi database belum dikonfigurasi.',
-      };
-    }
+  // Self signUp is disabled in Admin-Managed Auth Model
+  const signUp = async (): Promise<{ error?: string; isConfirmationRequired?: boolean; user?: User | null }> => {
+    return {
+      error: 'Registrasi mandiri tidak tersedia. Seluruh akun dikelola langsung oleh Administrator Jurusan.',
+    };
+  };
 
-    try {
-      const cleanEmail = email.trim().toLowerCase();
-      const redirectUrl = `${window.location.origin}/reset-password`;
-
-      const { error } = await supabase.auth.resetPasswordForEmail(cleanEmail, {
-        redirectTo: redirectUrl,
-      });
-
-      if (error) {
-        return { error: error.message };
-      }
-
-      return { success: true };
-    } catch (err: any) {
-      return { error: err.message || 'Gagal mengirim email reset kata sandi.' };
-    }
+  // Password recovery via email is disabled in Admin-Managed Auth Model
+  const resetPassword = async (): Promise<{ error?: string; success?: boolean }> => {
+    return {
+      error: 'Fitur reset sandi via email tidak tersedia. Silakan hubungi Administrator Jurusan.',
+    };
   };
 
   const updatePassword = async (password: string): Promise<{ error?: string; success?: boolean }> => {
@@ -486,6 +386,10 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { error: error.message };
       }
 
+      // Complete password change state in authorized_accounts
+      await authorizedAccountsService.completePasswordChange();
+      setMustChangePassword(false);
+
       return { success: true };
     } catch (err: any) {
       return { error: err.message || 'Gagal memperbarui kata sandi.' };
@@ -502,12 +406,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } finally {
       setUser(null);
       setProfile(null);
+      setMustChangePassword(false);
       setPreviewRoleState(null);
       try {
         localStorage.removeItem(STORAGE_PREVIEW_ROLE_KEY);
-      } catch {
-        // ignore
-      }
+      } catch {}
       setAuthStatus('UNAUTHENTICATED');
     }
   };
@@ -523,6 +426,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         effectiveRole,
         effectiveAccessMode,
         authStatus,
+        mustChangePassword,
         isOwnerAdmin,
         isSystemOwner,
         isAdmin,

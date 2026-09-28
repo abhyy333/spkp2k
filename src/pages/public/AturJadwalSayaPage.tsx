@@ -3,6 +3,7 @@ import {
   Calendar,
   Clock,
   MapPin,
+  DoorOpen,
   UserCheck,
   Search,
   Filter,
@@ -345,6 +346,7 @@ export const AturJadwalSayaPage: React.FC = () => {
 
       {/* Official Print Header */}
       <div className="hidden print:block text-center border-b-2 border-black pb-4 mb-6">
+        <UnramLogo size={56} className="mx-auto mb-2" />
         <h1 className="text-xl font-bold tracking-wider">UNIVERSITAS MATARAM</h1>
         <h2 className="text-base font-semibold">FAKULTAS TEKNIK • JURUSAN TEKNIK ELEKTRO</h2>
         <h3 className="text-sm font-bold uppercase mt-2">
@@ -487,8 +489,8 @@ export const AturJadwalSayaPage: React.FC = () => {
           </div>
 
           {/* Search & Filters */}
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex-1 min-w-[240px] relative">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3">
+            <div className="w-full sm:flex-1 relative">
               <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5 pointer-events-none" />
               <input
                 type="text"
@@ -498,30 +500,32 @@ export const AturJadwalSayaPage: React.FC = () => {
                 className="w-full pl-9 pr-3 py-2 text-xs border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 bg-slate-50/50"
               />
             </div>
-            <select
-              value={semesterFilter}
-              onChange={(e) => setSemesterFilter(e.target.value)}
-              className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50/50 font-medium text-slate-700"
-            >
-              <option value="ALL">Semua Semester</option>
-              {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
-                <option key={s} value={String(s)}>Semester {s}</option>
-              ))}
-            </select>
-            <select
-              value={classFilter}
-              onChange={(e) => setClassFilter(e.target.value)}
-              className="px-3 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50/50 font-medium text-slate-700"
-            >
-              <option value="ALL">Semua Kelas</option>
-              <option value="A">Kelas A</option>
-              <option value="B">Kelas B</option>
-              <option value="C">Kelas C</option>
-            </select>
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:items-center w-full sm:w-auto">
+              <select
+                value={semesterFilter}
+                onChange={(e) => setSemesterFilter(e.target.value)}
+                className="px-2.5 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50/50 font-medium text-slate-700 w-full sm:w-auto"
+              >
+                <option value="ALL">Semua Semester</option>
+                {[1, 2, 3, 4, 5, 6, 7, 8].map((s) => (
+                  <option key={s} value={String(s)}>Semester {s}</option>
+                ))}
+              </select>
+              <select
+                value={classFilter}
+                onChange={(e) => setClassFilter(e.target.value)}
+                className="px-2.5 py-2 text-xs border border-slate-200 rounded-xl bg-slate-50/50 font-medium text-slate-700 w-full sm:w-auto"
+              >
+                <option value="ALL">Semua Kelas</option>
+                <option value="A">Kelas A</option>
+                <option value="B">Kelas B</option>
+                <option value="C">Kelas C</option>
+              </select>
+            </div>
           </div>
 
-          {/* Offerings List Table */}
-          <div className="border border-slate-200 rounded-xl overflow-hidden">
+          {/* Desktop Offerings List Table (>= 640px) */}
+          <div className="hidden sm:block border border-slate-200 rounded-xl overflow-hidden">
             <table className="w-full text-xs text-left">
               <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-2xs uppercase tracking-wider">
                 <tr>
@@ -589,6 +593,71 @@ export const AturJadwalSayaPage: React.FC = () => {
             </table>
           </div>
 
+          {/* Mobile Offerings List View (< 640px) */}
+          <div className="block sm:hidden space-y-2.5">
+            {filteredOfferingsForSelection.length === 0 ? (
+              <div className="py-8 text-center text-slate-400 text-xs bg-slate-50/50 rounded-xl border border-dashed border-slate-200">
+                Tidak ada mata kuliah yang sesuai dengan pencarian.
+              </div>
+            ) : (
+              filteredOfferingsForSelection.map((item) => {
+                const key = item.course_offering_id || item.id;
+                const isSelected = selectedOfferingIds.includes(key);
+                return (
+                  <div
+                    key={key}
+                    onClick={() => {
+                      setSelectedOfferingIds((prev) =>
+                        isSelected ? prev.filter((id) => id !== key) : [...prev, key]
+                      );
+                    }}
+                    className={cn(
+                      'p-3 rounded-xl border transition-all cursor-pointer space-y-2',
+                      isSelected
+                        ? 'bg-blue-50/70 border-blue-400/80 shadow-2xs'
+                        : 'bg-white border-slate-200 hover:border-slate-300'
+                    )}
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0">
+                        <div className="pt-0.5 shrink-0">
+                          {isSelected ? (
+                            <CheckSquare className="w-4 h-4 text-blue-600" />
+                          ) : (
+                            <Square className="w-4 h-4 text-slate-300" />
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <h4 className="text-xs font-bold text-slate-900 leading-snug break-words">
+                            {item.course_name}
+                          </h4>
+                          <span className="text-2xs font-mono text-slate-500">
+                            {item.course_code}
+                          </span>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-800 text-2xs shrink-0">
+                        Kelas {item.class_name || 'A'}
+                      </span>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs font-medium text-slate-600 border-y border-slate-100/80 py-1.5 pl-6">
+                      <span className="font-bold text-slate-800">{item.day}</span>
+                      <span>{item.start_time} – {item.end_time}</span>
+                      <span className="font-semibold text-slate-700">{item.room_name || item.room_code || '-'}</span>
+                      <span>Smt {item.semester} • {item.effective_sks || item.sks || 3} SKS</span>
+                    </div>
+
+                    <div className="text-2xs text-slate-500 pl-6 break-words">
+                      <span className="font-semibold text-slate-600">Dosen: </span>
+                      {Array.isArray(item.lecturer_names) ? item.lecturer_names.join(', ') : item.lecturer_names}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
           {/* Sticky Bottom Action Bar */}
           <div className="flex items-center justify-between pt-4 border-t border-slate-100">
             <span className="text-2xs text-slate-500 font-medium">
@@ -642,57 +711,112 @@ export const AturJadwalSayaPage: React.FC = () => {
           </div>
 
           {viewMode === 'TABEL' || window.matchMedia?.('print').matches ? (
-            <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
-              <table className="w-full text-xs text-left">
-                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-2xs uppercase tracking-wider">
-                  <tr>
-                    <th className="py-3 px-4 w-12 text-center">No</th>
-                    <th className="py-3 px-4">Hari</th>
-                    <th className="py-3 px-4">Waktu</th>
-                    <th className="py-3 px-4">Mata Kuliah</th>
-                    <th className="py-3 px-3 text-center">Kelas</th>
-                    <th className="py-3 px-3 text-center">SKS</th>
-                    <th className="py-3 px-4">Ruangan</th>
-                    <th className="py-3 px-4">Dosen Pengampu</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {sortedSelectedEntries.map((item, idx) => {
-                    const isConflicting = personalConflicts.some(
-                      (c) => c.itemA.id === item.id || c.itemB.id === item.id
-                    );
-                    return (
-                      <tr
-                        key={item.id || idx}
-                        className={cn('hover:bg-slate-50 transition-colors', isConflicting && 'bg-rose-50/60')}
-                      >
-                        <td className="py-3 px-4 text-center text-slate-400">{idx + 1}</td>
-                        <td className="py-3 px-4 font-bold text-slate-900">{item.day}</td>
-                        <td className="py-3 px-4 font-mono font-medium text-slate-600">
-                          {item.start_time} – {item.end_time}
-                        </td>
-                        <td className="py-3 px-4">
-                          <p className="font-bold text-slate-900">{item.course_name}</p>
-                          <span className="font-mono text-2xs text-slate-400">{item.course_code}</span>
-                        </td>
-                        <td className="py-3 px-3 text-center">
-                          <span className="px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 text-2xs">
-                            {item.class_name || 'A'}
+            <>
+              {/* Desktop Table View (>= 640px) */}
+              <div className="hidden sm:block bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
+                <table className="w-full text-xs text-left">
+                  <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold text-2xs uppercase tracking-wider">
+                    <tr>
+                      <th className="py-3 px-4 w-12 text-center">No</th>
+                      <th className="py-3 px-4">Hari</th>
+                      <th className="py-3 px-4">Waktu</th>
+                      <th className="py-3 px-4">Mata Kuliah</th>
+                      <th className="py-3 px-3 text-center">Kelas</th>
+                      <th className="py-3 px-3 text-center">SKS</th>
+                      <th className="py-3 px-4">Ruangan</th>
+                      <th className="py-3 px-4">Dosen Pengampu</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {sortedSelectedEntries.map((item, idx) => {
+                      const isConflicting = personalConflicts.some(
+                        (c) => c.itemA.id === item.id || c.itemB.id === item.id
+                      );
+                      return (
+                        <tr
+                          key={item.id || idx}
+                          className={cn('hover:bg-slate-50 transition-colors', isConflicting && 'bg-rose-50/60')}
+                        >
+                          <td className="py-3 px-4 text-center text-slate-400">{idx + 1}</td>
+                          <td className="py-3 px-4 font-bold text-slate-900">{item.day}</td>
+                          <td className="py-3 px-4 font-mono font-medium text-slate-600">
+                            {item.start_time} – {item.end_time}
+                          </td>
+                          <td className="py-3 px-4">
+                            <p className="font-bold text-slate-900">{item.course_name}</p>
+                            <span className="font-mono text-2xs text-slate-400">{item.course_code}</span>
+                          </td>
+                          <td className="py-3 px-3 text-center">
+                            <span className="px-2 py-0.5 rounded-full font-bold bg-blue-100 text-blue-800 text-2xs">
+                              {item.class_name || 'A'}
+                            </span>
+                          </td>
+                          <td className="py-3 px-3 text-center font-semibold">{item.effective_sks || item.sks || 3}</td>
+                          <td className="py-3 px-4 font-semibold text-slate-800">
+                            {item.room_name || item.room_code || 'Ruang Kuliah'}
+                          </td>
+                          <td className="py-3 px-4 text-slate-600">
+                            {Array.isArray(item.lecturer_names) ? item.lecturer_names.join(', ') : item.lecturer_names}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Mobile Card List View (< 640px) */}
+              <div className="block sm:hidden space-y-2.5">
+                {sortedSelectedEntries.map((item, idx) => {
+                  const isConflicting = personalConflicts.some(
+                    (c) => c.itemA.id === item.id || c.itemB.id === item.id
+                  );
+                  return (
+                    <div
+                      key={item.id || idx}
+                      className={cn(
+                        'bg-white rounded-xl border p-3.5 shadow-2xs space-y-2',
+                        isConflicting ? 'border-rose-300 bg-rose-50/50' : 'border-slate-200'
+                      )}
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <span className="text-2xs font-extrabold uppercase tracking-wider text-blue-700 bg-blue-50 px-2 py-0.5 rounded border border-blue-200/60 inline-block mb-1">
+                            {item.day}
                           </span>
-                        </td>
-                        <td className="py-3 px-3 text-center font-semibold">{item.effective_sks || item.sks || 3}</td>
-                        <td className="py-3 px-4 font-semibold text-slate-800">
+                          <h4 className="text-xs font-bold text-slate-900 leading-snug break-words">
+                            {item.course_name}
+                          </h4>
+                          <span className="text-2xs font-mono text-slate-500">
+                            {item.course_code}
+                          </span>
+                        </div>
+                        <span className="inline-flex items-center px-2 py-0.5 rounded font-bold bg-blue-100 text-blue-800 text-2xs shrink-0">
+                          Kelas {item.class_name || 'A'}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-2xs font-medium text-slate-600 border-y border-slate-100 py-1.5">
+                        <span className="flex items-center gap-1 font-mono font-semibold text-slate-800">
+                          <Clock className="w-3 h-3 text-blue-600 shrink-0" />
+                          {item.start_time} – {item.end_time}
+                        </span>
+                        <span className="flex items-center gap-1 font-semibold text-slate-800">
+                          <DoorOpen className="w-3 h-3 text-amber-600 shrink-0" />
                           {item.room_name || item.room_code || 'Ruang Kuliah'}
-                        </td>
-                        <td className="py-3 px-4 text-slate-600">
-                          {Array.isArray(item.lecturer_names) ? item.lecturer_names.join(', ') : item.lecturer_names}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                        </span>
+                        <span>{item.effective_sks || item.sks || 3} SKS</span>
+                      </div>
+
+                      <div className="text-2xs text-slate-500 leading-snug break-words">
+                        <span className="font-semibold text-slate-600">Dosen: </span>
+                        {Array.isArray(item.lecturer_names) ? item.lecturer_names.join(', ') : item.lecturer_names}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           ) : (
             /* Personal Matrix View */
             <div className="print:hidden bg-white rounded-2xl border border-slate-200/80 p-6 shadow-xs space-y-4">

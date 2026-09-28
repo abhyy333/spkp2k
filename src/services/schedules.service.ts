@@ -21,9 +21,14 @@ const DAY_NAMES: Record<number, string> = {
 
 const PUBLISHED_SCHEDULE_CACHE_KEY = 'spk:cached-published-schedule';
 
+interface CourseInfo {
+  effective_sks?: number;
+  semester?: number;
+}
+
 function mapPublishedScheduleRow(
   row: any,
-  coursesMap: Map<string, number>
+  coursesMap: Map<string, CourseInfo>
 ): CurrentPublishedSchedule {
   const dayStr =
     row.day ||
@@ -55,18 +60,27 @@ function mapPublishedScheduleRow(
       ? row.session_count
       : calculatedSessionCount;
 
-  // Effective SKS resolution from coursesMap, relation, or duration calculation
+  // Effective SKS & Semester resolution from coursesMap, relation, or duration calculation
   const cCodeKey = String(row.course_code || '').trim().toUpperCase();
-  const effectiveSksFromMap =
+  const courseInfo =
     (row.course_id && coursesMap.get(row.course_id)) ||
     (cCodeKey && coursesMap.get(cCodeKey));
 
   const effectiveSks =
     row.course_offering?.course?.effective_sks ??
-    effectiveSksFromMap ??
+    courseInfo?.effective_sks ??
     row.effective_sks ??
     sessionCount ??
     calculatedSessionCount;
+
+  const semesterVal =
+    typeof row.semester === 'number' && row.semester > 0
+      ? row.semester
+      : typeof row.course_offering?.course?.semester === 'number' && row.course_offering.course.semester > 0
+      ? row.course_offering.course.semester
+      : typeof courseInfo?.semester === 'number' && courseInfo.semester > 0
+      ? courseInfo.semester
+      : 1;
 
   const startStr = row.start_time || minuteToTime(startMin);
   const endStr = row.end_time || minuteToTime(endMin);
@@ -87,6 +101,7 @@ function mapPublishedScheduleRow(
     sks: Number(effectiveSks),
     effective_sks: Number(effectiveSks),
     session_count: Number(sessionCount),
+    semester: semesterVal,
     start_minute: Number(startMin),
     end_minute: Number(endMin),
     day_of_week: Number(
@@ -209,19 +224,23 @@ export const schedulesService = {
     }
 
     try {
-      // 1. Fetch lookup map for courses to ensure authentic effective_sks
-      const coursesMap = new Map<string, number>();
+      // 1. Fetch lookup map for courses to ensure authentic effective_sks & semester
+      const coursesMap = new Map<string, CourseInfo>();
       try {
         const { data: coursesData } = await supabase
           .from('courses')
-          .select('id, code, effective_sks');
+          .select('id, code, effective_sks, semester');
         if (coursesData && Array.isArray(coursesData)) {
           for (const c of coursesData) {
-            if (c.id && typeof c.effective_sks === 'number') {
-              coursesMap.set(c.id, c.effective_sks);
+            const info: CourseInfo = {
+              effective_sks: typeof c.effective_sks === 'number' ? c.effective_sks : undefined,
+              semester: typeof c.semester === 'number' ? c.semester : undefined,
+            };
+            if (c.id) {
+              coursesMap.set(c.id, info);
             }
-            if (c.code && typeof c.effective_sks === 'number') {
-              coursesMap.set(String(c.code).trim().toUpperCase(), c.effective_sks);
+            if (c.code) {
+              coursesMap.set(String(c.code).trim().toUpperCase(), info);
             }
           }
         }

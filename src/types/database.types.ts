@@ -7,6 +7,7 @@ export interface AuthorizedAccount {
   user_id: string | null;
   is_active: boolean;
   is_system_owner: boolean;
+  must_change_password?: boolean;
   created_by: string | null;
   created_at: string;
   updated_at: string;
