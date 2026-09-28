@@ -101,8 +101,8 @@ export const AppTopbar: React.FC<AppTopbarProps> = ({
             }}
           >
             <Search className="w-4 h-4 text-slate-400 shrink-0" />
-            <span className="truncate text-slate-500 text-xs sm:text-sm">
-              Cari mata kuliah, dosen, ruangan...
+            <span className="truncate text-slate-500 text-xs sm:text-sm font-medium">
+              Cari halaman, jadwal, atau tanyakan sesuatu...
             </span>
             <kbd className="hidden md:inline-flex items-center gap-0.5 px-2 py-0.5 text-2xs font-medium text-slate-500 bg-white/80 border border-slate-200/80 rounded-md shadow-2xs shrink-0 ml-auto">
               Ctrl + K
@@ -112,24 +112,15 @@ export const AppTopbar: React.FC<AppTopbarProps> = ({
 
         {/* Right side items */}
         <div className="flex items-center gap-1.5 sm:gap-3 shrink-0">
-          {/* GUEST buttons */}
+          {/* GUEST button */}
           {!user && (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => navigate('/login')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition-colors cursor-pointer shrink-0"
-              >
-                <LogIn className="w-3.5 h-3.5" />
-                <span>Masuk</span>
-              </button>
-              <button
-                onClick={() => navigate('/register')}
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-2xs transition-colors cursor-pointer shrink-0"
-              >
-                <UserPlus className="w-3.5 h-3.5" />
-                <span>Daftar</span>
-              </button>
-            </div>
+            <button
+              onClick={() => navigate('/login')}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 shadow-2xs transition-colors cursor-pointer shrink-0"
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Masuk</span>
+            </button>
           )}
 
           {/* Divider */}
