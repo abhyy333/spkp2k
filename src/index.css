@@ -1,0 +1,117 @@
+@import "tailwindcss";
+
+:root {
+  --glass-bg: rgba(255, 255, 255, 0.75);
+  --glass-border: rgba(255, 255, 255, 0.8);
+  --glass-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+  --surface-radius: 20px;
+  --event-radius: 14px;
+}
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: linear-gradient(135deg, #F8FAFC 0%, #EEF4FF 50%, #F9FAFB 100%);
+    min-height: 100vh;
+    color: #1E293B;
+  }
+}
+
+/* Glassmorphism helpers - Optimized for 60fps rendering */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  border: 1px solid rgba(255, 255, 255, 0.8);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+}
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.85);
+  border: 1px solid rgba(255, 255, 255, 0.85);
+  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+}
+
+.glass-sidebar {
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(16px) saturate(130%);
+  -webkit-backdrop-filter: blur(16px) saturate(130%);
+  border-right: 1px solid rgba(255, 255, 255, 0.75);
+}
+
+.glass-topbar {
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.72);
+}
+
+/* Calendar & Event Card Performance Containment */
+.calendar-containment {
+  contain: layout paint;
+}
+
+.event-card-containment {
+  contain: paint;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+/* Custom subtle scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Academic Document Print Styles */
+@page {
+  size: A4 landscape;
+  margin: 10mm;
+}
+
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Hide app layout elements when printing */
+  header,
+  nav,
+  aside,
+  .glass-sidebar,
+  .glass-topbar,
+  .print\\:hidden {
+    display: none !important;
+  }
+
+  table {
+    border-collapse: collapse !important;
+    width: 100% !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+}
+
