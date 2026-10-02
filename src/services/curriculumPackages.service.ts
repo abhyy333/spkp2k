@@ -76,40 +76,12 @@ export const curriculumPackagesService = {
     }
 
     try {
-      const isOwner = await verifyOwnerAdmin();
-      const tableName = isOwner ? 'curriculum_packages' : 'guest_curriculum_packages';
-
-      let data: any[] | null = null;
-      let queryError: any = null;
-
-      try {
-        const res = await supabase
-          .from(tableName)
-          .select('*')
-          .order('name', { ascending: true });
-        data = res.data;
-        queryError = res.error;
-      } catch (err: any) {
-        queryError = err;
-      }
-
-      // If guest_curriculum_packages view doesn't exist or errored, try direct curriculum_packages
-      if (queryError && !isOwner) {
-        try {
-          const fallbackRes = await supabase
-            .from('curriculum_packages')
-            .select('*')
-            .order('name', { ascending: true });
-          if (!fallbackRes.error && fallbackRes.data && fallbackRes.data.length > 0) {
-            data = fallbackRes.data;
-            queryError = null;
-          } else if (fallbackRes.error) {
-            queryError = fallbackRes.error;
-          }
-        } catch (fbErr: any) {
-          queryError = fbErr;
-        }
-      }
+      const res = await supabase
+        .from('curriculum_packages')
+        .select('*')
+        .order('name', { ascending: true });
+      const data = res.data;
+      const queryError = res.error;
 
       // If database query succeeded and returned rows, parse and return them
       if (!queryError && data && Array.isArray(data) && data.length > 0) {
@@ -124,8 +96,6 @@ export const curriculumPackagesService = {
         }));
       }
 
-      // If query failed (e.g. 42501 permission denied for anon or table does not exist) or returned empty:
-      // Gracefully fall back to official curriculum packages definitions
       return getDefaultCurriculumPackages();
     } catch (err: any) {
       console.warn('Menggunakan paket kurikulum resmi default:', err?.message || err);
@@ -152,19 +122,9 @@ export const curriculumPackagesService = {
     if (!isSupabaseConfigured()) return map;
 
     try {
-      const isOwner = await verifyOwnerAdmin();
-      const tableName = isOwner ? 'courses' : 'guest_courses';
-
-      let { data, error } = await supabase
-        .from(tableName)
+      const { data } = await supabase
+        .from('courses')
         .select('code, course_type, category');
-
-      if (error && !isOwner) {
-        const fallback = await supabase
-          .from('courses')
-          .select('code, course_type, category');
-        data = fallback.data;
-      }
 
       if (data) {
         data.forEach((c: any) => {

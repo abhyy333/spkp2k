@@ -447,6 +447,11 @@ export const lecturersService = {
     return null;
   },
 
+  async getLecturerByEmail(email: string): Promise<Lecturer | null> {
+    if (!isSupabaseConfigured() || !email) return null;
+    return this.getLecturerForUser('', email);
+  },
+
   /**
    * Update profil mandiri oleh dosen (hanya field terbatas yang diizinkan)
    */

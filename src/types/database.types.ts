@@ -1,4 +1,4 @@
-export type UserRole = 'ADMIN' | 'DOSEN' | 'MAHASISWA';
+export type UserRole = 'ADMIN' | 'DOSEN';
 
 export interface AuthorizedAccount {
   email: string;
@@ -26,7 +26,9 @@ export interface Profile {
   phone?: string | null;
   contact_email?: string | null;
   avatar_url?: string | null;
-  preview_roles?: UserRole[] | null;
+  lecturer_id?: string | null;
+  is_active?: boolean;
+  must_change_password?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -502,6 +504,10 @@ export interface CurriculumPackageCourse {
   name: string;
   sks: number;
   order: number;
+  semester?: number;
+  effective_sks?: number;
+  curriculum_year?: number;
+  is_elective?: boolean;
   source_names?: string[];
   source_sheets?: string[];
 }

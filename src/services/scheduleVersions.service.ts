@@ -1635,4 +1635,189 @@ export const scheduleVersionsService = {
 
     return { ok: true, statusType };
   },
+
+  /**
+   * Save a snapshot version without modifying the current workspace
+   */
+  async saveSnapshotVersion(
+    draftVersionId: string,
+    snapshotTitle: string
+  ): Promise<ScheduleVersion> {
+    await assertOwnerAdmin('menyimpan snapshot versi jadwal');
+    if (!isSupabaseConfigured()) {
+      throw new Error('Database belum terhubung.');
+    }
+
+    const draft = await this.getVersionById(draftVersionId);
+    if (!draft) throw new Error('Draft tidak ditemukan.');
+    const termId = draft.academic_term_id || draft.term_id;
+    const isExam = draft.type === 'UTS' || draft.type === 'UAS';
+
+    // 1. Insert new snapshot version
+    const { data: newVersion, error: vErr } = await supabase
+      .from('schedule_versions')
+      .insert({
+        academic_term_id: termId,
+        term_id: termId,
+        title: snapshotTitle.trim() || `Versi Snapshot`,
+        status: 'ARCHIVED',
+        type: draft.type || 'LECTURE',
+        revision: 1,
+        source_version_id: draftVersionId,
+        scope_offering_ids: draft.scope_offering_ids,
+        workflow_state: draft.workflow_state,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .select()
+      .single();
+
+    if (vErr || !newVersion) {
+      throw new Error(parseSupabaseError(vErr) || 'Gagal menyimpan snapshot versi.');
+    }
+
+    // 2. Copy entries from draft
+    if (isExam) {
+      const { data: examEntries } = await supabase
+        .from('exam_entries')
+        .select('*')
+        .eq('schedule_version_id', draftVersionId);
+
+      if (examEntries && examEntries.length > 0) {
+        const cloned = examEntries.map((e: any) => {
+          const { id, ...rest } = e;
+          return {
+            ...rest,
+            schedule_version_id: newVersion.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        });
+        await supabase.from('exam_entries').insert(cloned);
+      }
+    } else {
+      const { data: schedEntries } = await supabase
+        .from('schedule_entries')
+        .select('*')
+        .eq('schedule_version_id', draftVersionId);
+
+      if (schedEntries && schedEntries.length > 0) {
+        const cloned = schedEntries.map((e: any) => {
+          const { id, end_minute, ...rest } = e;
+          return {
+            ...rest,
+            schedule_version_id: newVersion.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        });
+        await supabase.from('schedule_entries').insert(cloned);
+      }
+    }
+
+    return newVersion as ScheduleVersion;
+  },
+
+  /**
+   * Restore snapshot into workspace draft without altering original snapshot
+   */
+  async restoreVersionToDraft(
+    snapshotVersionId: string,
+    academicTermId: string
+  ): Promise<ScheduleVersion> {
+    await assertOwnerAdmin('memulihkan versi jadwal ke Workspace');
+    if (!isSupabaseConfigured()) {
+      throw new Error('Database belum terhubung.');
+    }
+
+    const snapshot = await this.getVersionById(snapshotVersionId);
+    if (!snapshot) throw new Error('Versi snapshot tidak ditemukan.');
+
+    const isExam = snapshot.type === 'UTS' || snapshot.type === 'UAS';
+    const schedType = (snapshot.type || 'LECTURE') as 'LECTURE' | 'UTS' | 'UAS';
+
+    // 1. Resolve or create active draft workspace
+    let draft = await this.resolveActiveDraft({
+      academicTermId,
+      type: schedType,
+    });
+
+    if (!draft) {
+      draft = await this.createDraft(
+        academicTermId,
+        `Workspace ${schedType} (Pemulihan)`
+      );
+    }
+
+    if (!draft) {
+      throw new Error('Gagal menyiapkan workspace draft untuk pemulihan.');
+    }
+
+    // 2. Clear current workspace draft entries
+    if (isExam) {
+      await supabase
+        .from('exam_entries')
+        .delete()
+        .eq('schedule_version_id', draft.id);
+
+      // 3. Clone entries from snapshot
+      const { data: snapshotExams } = await supabase
+        .from('exam_entries')
+        .select('*')
+        .eq('schedule_version_id', snapshotVersionId);
+
+      if (snapshotExams && snapshotExams.length > 0) {
+        const cloned = snapshotExams.map((e: any) => {
+          const { id, ...rest } = e;
+          return {
+            ...rest,
+            schedule_version_id: draft.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        });
+        await supabase.from('exam_entries').insert(cloned);
+      }
+    } else {
+      await supabase
+        .from('schedule_entries')
+        .delete()
+        .eq('schedule_version_id', draft.id);
+
+      // 3. Clone entries from snapshot
+      const { data: snapshotEntries } = await supabase
+        .from('schedule_entries')
+        .select('*')
+        .eq('schedule_version_id', snapshotVersionId);
+
+      if (snapshotEntries && snapshotEntries.length > 0) {
+        const cloned = snapshotEntries.map((e: any) => {
+          const { id, end_minute, ...rest } = e;
+          return {
+            ...rest,
+            schedule_version_id: draft.id,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          };
+        });
+        await supabase.from('schedule_entries').insert(cloned);
+      }
+    }
+
+    // 4. Update draft metadata
+    const newRev = (draft.revision || 1) + 1;
+    await supabase
+      .from('schedule_versions')
+      .update({
+        revision: newRev,
+        workflow_state: snapshot.workflow_state,
+        scope_offering_ids: snapshot.scope_offering_ids,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', draft.id);
+
+    await this.refreshConflicts(draft.id);
+    const refreshed = await this.getVersionById(draft.id);
+    return refreshed || draft;
+  },
 };

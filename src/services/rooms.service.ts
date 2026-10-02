@@ -1,7 +1,8 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Room } from '../types';
 import { parseSupabaseError } from '../lib/utils';
-import { verifyOwnerAdmin, assertOwnerAdmin } from '../lib/authGuard';
+import { assertOwnerAdmin } from '../lib/authGuard';
+import { fetchWithCache, invalidateCache } from '../lib/queryCache';
 
 export const roomsService = {
   async getRooms(filters?: { search?: string; type?: string; status?: string }): Promise<Room[]> {
@@ -9,47 +10,52 @@ export const roomsService = {
       throw new Error('Koneksi database belum dikonfigurasi.');
     }
 
-    const isOwner = await verifyOwnerAdmin();
-    const table = isOwner ? 'rooms' : 'guest_rooms';
+    const cacheKey = `rooms_${JSON.stringify(filters || {})}`;
 
-    let query = supabase
-      .from(table)
-      .select('*')
-      .order('code', { ascending: true });
+    return fetchWithCache(
+      cacheKey,
+      async () => {
+        let query = supabase
+          .from('rooms')
+          .select('id, code, name, capacity, room_type, is_active, facilities')
+          .order('code', { ascending: true });
 
-    if (filters?.type && filters.type !== 'all') {
-      query = query.eq('room_type', filters.type);
-    }
-    if (filters?.status && filters.status !== 'all') {
-      if (filters.status === 'active') {
-        query = query.eq('is_active', true);
-      } else if (filters.status === 'inactive') {
-        query = query.eq('is_active', false);
-      }
-    }
+        if (filters?.type && filters.type !== 'all') {
+          query = query.eq('room_type', filters.type);
+        }
+        if (filters?.status && filters.status !== 'all') {
+          if (filters.status === 'active') {
+            query = query.eq('is_active', true);
+          } else if (filters.status === 'inactive') {
+            query = query.eq('is_active', false);
+          }
+        }
 
-    const { data, error } = await query;
-    if (error) {
-      console.error('Error fetching rooms:', error);
-      throw new Error(parseSupabaseError(error));
-    }
+        const { data, error } = await query;
+        if (error) {
+          console.error('Error fetching rooms:', error);
+          throw new Error(parseSupabaseError(error));
+        }
 
-    let rooms: Room[] = (data || []).map((r: any) => ({
-      ...r,
-      status: r.is_active ? 'Tersedia' : 'Nonaktif',
-    }));
+        let rooms: Room[] = (data || []).map((r: any) => ({
+          ...r,
+          status: r.is_active ? 'Tersedia' : 'Nonaktif',
+        }));
 
-    if (filters?.search) {
-      const s = filters.search.toLowerCase().trim();
-      rooms = rooms.filter(
-        (r) =>
-          (r.name && r.name.toLowerCase().includes(s)) ||
-          (r.code && r.code.toLowerCase().includes(s)) ||
-          (r.building && r.building.toLowerCase().includes(s))
-      );
-    }
+        if (filters?.search) {
+          const s = filters.search.toLowerCase().trim();
+          rooms = rooms.filter(
+            (r) =>
+              (r.name && r.name.toLowerCase().includes(s)) ||
+              (r.code && r.code.toLowerCase().includes(s)) ||
+              (r.room_type && r.room_type.toLowerCase().includes(s))
+          );
+        }
 
-    return rooms;
+        return rooms;
+      },
+      { staleTimeMs: 10 * 60 * 1000 }
+    );
   },
 
   async getRoomById(id: string): Promise<Room> {
@@ -57,10 +63,7 @@ export const roomsService = {
       throw new Error('Koneksi database belum dikonfigurasi.');
     }
 
-    const isOwner = await verifyOwnerAdmin();
-    const table = isOwner ? 'rooms' : 'guest_rooms';
-
-    const { data, error } = await supabase.from(table).select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('rooms').select('*').eq('id', id).single();
     if (error) throw new Error(parseSupabaseError(error));
     return data;
   },
@@ -188,9 +191,7 @@ export const roomsService = {
   async getDistinctRoomTypes(): Promise<string[]> {
     if (!isSupabaseConfigured()) return ['Ruang Kuliah Teori', 'Laboratorium Komputer'];
     try {
-      const isOwner = await verifyOwnerAdmin();
-      const table = isOwner ? 'rooms' : 'guest_rooms';
-      const { data, error } = await supabase.from(table).select('room_type');
+      const { data, error } = await supabase.from('rooms').select('room_type');
       if (error) throw error;
       const types = Array.from(new Set((data || []).map((r: any) => r.room_type).filter(Boolean)));
       return types.length > 0 ? types : ['Ruang Kuliah Teori', 'Laboratorium Komputer', 'Laboratorium Elektronika'];
@@ -205,9 +206,7 @@ export const roomsService = {
     }
 
     try {
-      const isOwner = await verifyOwnerAdmin();
-      const table = isOwner ? 'rooms' : 'guest_rooms';
-      const { data, error } = await supabase.from(table).select('*');
+      const { data, error } = await supabase.from('rooms').select('id, capacity, is_active');
       if (error) throw error;
 
       const total = data?.length || 0;

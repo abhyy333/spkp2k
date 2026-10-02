@@ -2,6 +2,7 @@ import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { getActiveAcademicTerm } from './academicTerms.service';
 import { scheduleEntriesService } from './scheduleEntries.service';
 import { minuteToTime, timeToMinute } from '../lib/utils';
+import { fetchWithCache } from '../lib/queryCache';
 import {
   CurrentPublishedSchedule,
   CurrentPublishedExam,
@@ -223,97 +224,90 @@ export const schedulesService = {
       return [];
     }
 
-    try {
-      // 1. Fetch lookup map for courses to ensure authentic effective_sks & semester
-      const coursesMap = new Map<string, CourseInfo>();
-      try {
-        const { data: coursesData } = await supabase
-          .from('courses')
-          .select('id, code, effective_sks, semester');
-        if (coursesData && Array.isArray(coursesData)) {
-          for (const c of coursesData) {
-            const info: CourseInfo = {
-              effective_sks: typeof c.effective_sks === 'number' ? c.effective_sks : undefined,
-              semester: typeof c.semester === 'number' ? c.semester : undefined,
-            };
-            if (c.id) {
-              coursesMap.set(c.id, info);
-            }
-            if (c.code) {
-              coursesMap.set(String(c.code).trim().toUpperCase(), info);
-            }
-          }
-        }
-      } catch (cErr) {
-        console.warn('Courses lookup warning:', cErr);
-      }
+    const cacheKey = `published_schedule_${filters?.termId || 'active'}_${filters?.day || 'all'}_${filters?.className || 'all'}`;
 
-      // 2. Query published schedule view
-      let query = supabase.from('current_published_schedule').select('*');
-
-      if (filters?.termId && filters.termId !== 'all') {
-        query = query.eq('academic_term_id', filters.termId);
-      }
-      if (filters?.day && filters.day !== 'all') {
-        query = query.eq('day', filters.day);
-      }
-      if (filters?.className && filters.className !== 'all') {
-        query = query.eq('class_name', filters.className);
-      }
-
-      const { data, error } = await query;
-      if (!error && data && Array.isArray(data)) {
-        const mapped = data.map((row: any) => mapPublishedScheduleRow(row, coursesMap));
+    return fetchWithCache(
+      cacheKey,
+      async () => {
         try {
-          if (mapped.length > 0 && (!filters?.day || filters.day === 'all') && (!filters?.className || filters.className === 'all')) {
-            localStorage.setItem(PUBLISHED_SCHEDULE_CACHE_KEY, JSON.stringify(mapped));
-          } else if (mapped.length === 0) {
-            localStorage.removeItem(PUBLISHED_SCHEDULE_CACHE_KEY);
+          // 1. Fetch lookup map for courses to ensure authentic effective_sks & semester
+          const coursesMap = new Map<string, CourseInfo>();
+          try {
+            const { data: coursesData } = await supabase
+              .from('courses')
+              .select('id, code, effective_sks, semester');
+            if (coursesData && Array.isArray(coursesData)) {
+              for (const c of coursesData) {
+                const info: CourseInfo = {
+                  effective_sks: typeof c.effective_sks === 'number' ? c.effective_sks : undefined,
+                  semester: typeof c.semester === 'number' ? c.semester : undefined,
+                };
+                if (c.id) {
+                  coursesMap.set(c.id, info);
+                }
+                if (c.code) {
+                  coursesMap.set(String(c.code).trim().toUpperCase(), info);
+                }
+              }
+            }
+          } catch (cErr) {
+            console.warn('Courses lookup warning:', cErr);
           }
-        } catch (_) {}
-        return mapped;
-      }
 
-      // If view query returned an error (such as 42501 permission denied), attempt security definer RPC
-      if (error) {
-        console.warn(
-          'Notice querying current_published_schedule (code ' +
-            (error?.code || 'unknown') +
-            '): ' +
-            (error?.message || 'Access restricted') +
-            '. Initiating RPC fallback.'
-        );
+          // 2. Query published schedule view
+          let query = supabase.from('current_published_schedule').select('*');
 
-        try {
-          const rpcParams =
-            filters?.termId && filters.termId !== 'all'
-              ? { p_academic_term_id: filters.termId }
-              : {};
-          const { data: rpcData, error: rpcErr } = await supabase.rpc(
-            'get_current_published_schedule',
-            rpcParams
-          );
-          if (!rpcErr && rpcData && Array.isArray(rpcData)) {
-            const mappedRpc = rpcData.map((row: any) => mapPublishedScheduleRow(row, coursesMap));
+          if (filters?.termId && filters.termId !== 'all') {
+            query = query.eq('academic_term_id', filters.termId);
+          }
+          if (filters?.day && filters.day !== 'all') {
+            query = query.eq('day', filters.day);
+          }
+          if (filters?.className && filters.className !== 'all') {
+            query = query.eq('class_name', filters.className);
+          }
+
+          const { data, error } = await query;
+          if (!error && data && Array.isArray(data)) {
+            const mapped = data.map((row: any) => mapPublishedScheduleRow(row, coursesMap));
             try {
-              if (mappedRpc.length > 0) {
-                localStorage.setItem(PUBLISHED_SCHEDULE_CACHE_KEY, JSON.stringify(mappedRpc));
-              } else {
+              if (mapped.length > 0 && (!filters?.day || filters.day === 'all') && (!filters?.className || filters.className === 'all')) {
+                localStorage.setItem(PUBLISHED_SCHEDULE_CACHE_KEY, JSON.stringify(mapped));
+              } else if (mapped.length === 0) {
                 localStorage.removeItem(PUBLISHED_SCHEDULE_CACHE_KEY);
               }
             } catch (_) {}
-            return applyScheduleFilters(mappedRpc, filters);
+            return mapped;
           }
-        } catch (rpcEx) {
-          console.warn('RPC fallback notice:', rpcEx);
-        }
-      }
 
-      return [];
-    } catch (err) {
-      console.warn('Notice fetching published schedule:', err);
-      return [];
-    }
+          // If view query returned an error, attempt security definer RPC
+          if (error) {
+            try {
+              const rpcParams =
+                filters?.termId && filters.termId !== 'all'
+                  ? { p_academic_term_id: filters.termId }
+                  : {};
+              const { data: rpcData, error: rpcErr } = await supabase.rpc(
+                'get_current_published_schedule',
+                rpcParams
+              );
+              if (!rpcErr && rpcData && Array.isArray(rpcData)) {
+                const mappedRpc = rpcData.map((row: any) => mapPublishedScheduleRow(row, coursesMap));
+                return applyScheduleFilters(mappedRpc, filters);
+              }
+            } catch (rpcEx) {
+              console.warn('RPC fallback notice:', rpcEx);
+            }
+          }
+
+          return [];
+        } catch (err) {
+          console.warn('Notice fetching published schedule:', err);
+          return [];
+        }
+      },
+      { staleTimeMs: 5 * 60 * 1000 }
+    );
   },
 
   async getPublishedExams(examType?: 'UTS' | 'UAS'): Promise<CurrentPublishedExam[]> {

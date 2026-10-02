@@ -8,24 +8,16 @@ import { AppLoader } from '../components/ui/AppLoader';
 // Auth Pages
 import { AuthPage } from '../pages/auth/AuthPage';
 import { ForgotPasswordPage } from '../pages/auth/ForgotPasswordPage';
-import { ResetPasswordPage } from '../pages/auth/ResetPasswordPage';
 
 // Admin Pages
 import { AdminDashboard } from '../pages/admin/AdminDashboard';
-import { CoursesPage } from '../pages/admin/CoursesPage';
-import { LecturersPage } from '../pages/admin/LecturersPage';
-import { RoomsPage } from '../pages/admin/RoomsPage';
-import { TimeSlotsPage } from '../pages/admin/TimeSlotsPage';
-import { CourseOfferingsPage } from '../pages/admin/CourseOfferingsPage';
-import { ScheduleConflictsPage } from '../pages/admin/ScheduleConflictsPage';
-import { ScheduleViewerPage } from '../pages/admin/ScheduleViewerPage';
+import { MasterDataPage } from '../pages/admin/MasterDataPage';
 import { UnifiedSchedulingPage } from '../pages/admin/UnifiedSchedulingPage';
 import { SettingsPage } from '../pages/admin/SettingsPage';
 
 // Lecturer Pages
 import { LecturerDashboard } from '../pages/lecturer/LecturerDashboard';
 import { LecturerProfilePage } from '../pages/lecturer/LecturerProfilePage';
-import { AturJadwalSayaPage } from '../pages/public/AturJadwalSayaPage';
 import { OfficialScheduleTablePage } from '../pages/public/OfficialScheduleTablePage';
 
 // Lazy Loaded Heavy Pages for Performance
@@ -35,14 +27,8 @@ const ExamSchedulePage = React.lazy(() =>
 const VersionHistoryPage = React.lazy(() =>
   import('../pages/admin/VersionHistoryPage').then((m) => ({ default: m.VersionHistoryPage }))
 );
-const ReportsPage = React.lazy(() =>
-  import('../pages/admin/ReportsPage').then((m) => ({ default: m.ReportsPage }))
-);
 const AccountManagementPage = React.lazy(() =>
   import('../pages/admin/AccountManagementPage').then((m) => ({ default: m.AccountManagementPage }))
-);
-const SAEvaluationPage = React.lazy(() =>
-  import('../pages/admin/SAEvaluationPage').then((m) => ({ default: m.SAEvaluationPage }))
 );
 
 const LazyFallback: React.FC = () => (
@@ -70,16 +56,12 @@ const UnifiedDashboard: React.FC = () => {
 };
 
 export const AppRoutes: React.FC = () => {
-  const { authStatus, effectiveAccessMode } = useAuth();
+  const { authStatus, isAuthenticated } = useAuth();
 
   // 1. MUST WAIT FOR AUTH STATUS INITIALIZATION
   if (authStatus === 'INITIALIZING') {
     return <AppLoader />;
   }
-
-  // 2. Determine default landing route based on effective access mode
-  const defaultDestination =
-    effectiveAccessMode === 'GUEST' ? '/jadwal-perkuliahan' : '/dashboard';
 
   return (
     <Routes>
@@ -91,10 +73,13 @@ export const AppRoutes: React.FC = () => {
       <Route path="/reset-password" element={<ForgotPasswordPage />} />
       <Route path="/403" element={<ForbiddenPage />} />
 
-      {/* Root redirect */}
-      <Route path="/" element={<Navigate to={defaultDestination} replace />} />
+      {/* Root redirect: authenticated goes to /dashboard, unauthenticated goes to /login */}
+      <Route
+        path="/"
+        element={isAuthenticated ? <Navigate to="/dashboard" replace /> : <Navigate to="/login" replace />}
+      />
 
-      {/* Main Application Shell */}
+      {/* Main Application Shell - Protected for ADMIN and DOSEN */}
       <Route
         element={
           <ProtectedRoute>
@@ -103,28 +88,33 @@ export const AppRoutes: React.FC = () => {
         }
       >
         {/* ========================================================
-            PUBLIC SCHEDULE VIEWER ROUTES (GUEST, DOSEN, ADMIN)
-            These routes bypass generic protected guards completely.
-           ======================================================== */}
-        <Route path="/jadwal-perkuliahan" element={<OfficialScheduleTablePage />} />
-        <Route
-          path="/jadwal-ujian"
-          element={
-            <React.Suspense fallback={<LazyFallback />}>
-              <ExamSchedulePage />
-            </React.Suspense>
-          }
-        />
-        <Route path="/jadwal-saya" element={<AturJadwalSayaPage />} />
-
-        {/* ========================================================
-            AUTHENTICATED ONLY ROUTES (/dashboard & /profil)
+            CORE SHARED ROUTES (ADMIN & DOSEN)
            ======================================================== */}
         <Route
           path="/dashboard"
           element={
             <RoleGuard allowedRoles={['ADMIN', 'DOSEN']}>
               <UnifiedDashboard />
+            </RoleGuard>
+          }
+        />
+
+        <Route
+          path="/jadwal-perkuliahan"
+          element={
+            <RoleGuard allowedRoles={['ADMIN', 'DOSEN']}>
+              <OfficialScheduleTablePage />
+            </RoleGuard>
+          }
+        />
+
+        <Route
+          path="/jadwal-ujian"
+          element={
+            <RoleGuard allowedRoles={['ADMIN', 'DOSEN']}>
+              <React.Suspense fallback={<LazyFallback />}>
+                <ExamSchedulePage />
+              </React.Suspense>
             </RoleGuard>
           }
         />
@@ -138,13 +128,14 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
-        {/* Lecturer Aliases & Backward Compatibility */}
+        {/* Legacy redirects */}
+        <Route path="/jadwal-saya" element={<Navigate to="/jadwal-perkuliahan" replace />} />
         <Route path="/dosen/dashboard" element={<Navigate to="/dashboard" replace />} />
         <Route path="/dosen/profil" element={<Navigate to="/profil" replace />} />
-        <Route path="/dosen/jadwal-saya" element={<Navigate to="/profil" replace />} />
+        <Route path="/dosen/jadwal-saya" element={<Navigate to="/jadwal-perkuliahan" replace />} />
 
         {/* ========================================================
-            ADMIN ONLY ROUTES (Strictly Protected)
+            ADMIN ONLY ROUTES
            ======================================================== */}
         <Route
           path="/penyusunan-jadwal"
@@ -155,55 +146,24 @@ export const AppRoutes: React.FC = () => {
           }
         />
 
-        {/* Master Data Routes */}
+        {/* Master Data: Single page with tabs */}
         <Route
-          path="/data-mata-kuliah"
+          path="/master-data"
           element={
             <RoleGuard allowedRoles={['ADMIN']}>
-              <CoursesPage />
+              <MasterDataPage />
             </RoleGuard>
           }
         />
-        <Route
-          path="/data-dosen"
-          element={
-            <RoleGuard allowedRoles={['ADMIN']}>
-              <LecturersPage />
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/ruangan"
-          element={
-            <RoleGuard allowedRoles={['ADMIN']}>
-              <RoomsPage />
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/slot-waktu"
-          element={
-            <RoleGuard allowedRoles={['ADMIN']}>
-              <TimeSlotsPage />
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/penawaran-kelas"
-          element={<Navigate to="/penyusunan-jadwal" replace />}
-        />
+        <Route path="/data-mata-kuliah" element={<Navigate to="/master-data?tab=mata-kuliah" replace />} />
+        <Route path="/data-dosen" element={<Navigate to="/master-data?tab=dosen" replace />} />
+        <Route path="/ruangan" element={<Navigate to="/master-data?tab=ruangan" replace />} />
+        <Route path="/slot-waktu" element={<Navigate to="/master-data?tab=slot-waktu" replace />} />
+        <Route path="/penawaran-kelas" element={<Navigate to="/penyusunan-jadwal" replace />} />
 
-        {/* Monitoring & Operational Routes */}
+        {/* Riwayat Versi Jadwal */}
         <Route
-          path="/konflik-jadwal"
-          element={
-            <RoleGuard allowedRoles={['ADMIN']}>
-              <ScheduleConflictsPage />
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/riwayat-jadwal"
+          path="/riwayat"
           element={
             <RoleGuard allowedRoles={['ADMIN']}>
               <React.Suspense fallback={<LazyFallback />}>
@@ -212,38 +172,10 @@ export const AppRoutes: React.FC = () => {
             </RoleGuard>
           }
         />
-        <Route
-          path="/riwayat-versi"
-          element={
-            <RoleGuard allowedRoles={['ADMIN']}>
-              <React.Suspense fallback={<LazyFallback />}>
-                <VersionHistoryPage />
-              </React.Suspense>
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/evaluasi-sa"
-          element={
-            <RoleGuard allowedRoles={['ADMIN']}>
-              <React.Suspense fallback={<LazyFallback />}>
-                <SAEvaluationPage />
-              </React.Suspense>
-            </RoleGuard>
-          }
-        />
-        <Route
-          path="/laporan"
-          element={
-            <RoleGuard allowedRoles={['ADMIN']}>
-              <React.Suspense fallback={<LazyFallback />}>
-                <ReportsPage />
-              </React.Suspense>
-            </RoleGuard>
-          }
-        />
+        <Route path="/riwayat-jadwal" element={<Navigate to="/riwayat" replace />} />
+        <Route path="/riwayat-versi" element={<Navigate to="/riwayat" replace />} />
 
-        {/* Administration & Settings Routes */}
+        {/* Account Management & Settings */}
         <Route
           path="/manajemen-akun"
           element={
@@ -254,16 +186,7 @@ export const AppRoutes: React.FC = () => {
             </RoleGuard>
           }
         />
-        <Route
-          path="/pengaturan/akun"
-          element={
-            <RoleGuard allowedRoles={['ADMIN']}>
-              <React.Suspense fallback={<LazyFallback />}>
-                <AccountManagementPage />
-              </React.Suspense>
-            </RoleGuard>
-          }
-        />
+        <Route path="/pengaturan/akun" element={<Navigate to="/manajemen-akun" replace />} />
         <Route
           path="/pengaturan"
           element={
@@ -272,6 +195,11 @@ export const AppRoutes: React.FC = () => {
             </RoleGuard>
           }
         />
+
+        {/* Removed legacy features redirected cleanly */}
+        <Route path="/konflik-jadwal" element={<Navigate to="/penyusunan-jadwal" replace />} />
+        <Route path="/evaluasi-sa" element={<Navigate to="/penyusunan-jadwal" replace />} />
+        <Route path="/laporan" element={<Navigate to="/dashboard" replace />} />
       </Route>
 
       {/* 404 Catch All */}

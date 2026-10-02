@@ -12,6 +12,7 @@ import {
   History,
   Lock,
   ArrowLeft,
+  ArrowRight,
   Search,
   Filter,
   Layers,
@@ -30,6 +31,8 @@ import {
   ExternalLink,
   PlusCircle,
   Save,
+  Download,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { supabase } from '../../../lib/supabase';
 import {
@@ -53,6 +56,8 @@ import { toast } from '../../ui/Toast';
 import { useNavigate } from 'react-router-dom';
 import { AppleWeeklyCalendar } from '../../schedule/AppleWeeklyCalendar';
 import { AppleScheduleCardData } from '../../schedule/AppleScheduleCard';
+import { generateLectureSchedulePDF } from '../../../lib/pdf/pdfGenerator';
+import { generateLectureScheduleExcel } from '../../../lib/excel/excelGenerator';
 
 interface SchedulingPreviewPublishViewProps {
   entries: InitialScheduleEntry[];
@@ -106,8 +111,91 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
   const [refreshing, setRefreshing] = useState<boolean>(false);
   const [publishing, setPublishing] = useState<boolean>(false);
   const [showPublishModal, setShowPublishModal] = useState<boolean>(false);
+  const [showSaveSnapshotModal, setShowSaveSnapshotModal] = useState<boolean>(false);
+  const [snapshotTitle, setSnapshotTitle] = useState<string>('');
+  const [savingSnapshot, setSavingSnapshot] = useState<boolean>(false);
   const [showUnscheduledModal, setShowUnscheduledModal] = useState<boolean>(false);
   const [publishTitle, setPublishTitle] = useState<string>('');
+
+  const handleExportPDF = async () => {
+    if (activeEntries.length === 0) {
+      toast.error('Tidak ada jadwal untuk diekspor.');
+      return;
+    }
+    try {
+      const mapped = activeEntries.map((e) => ({
+        id: e.courseOfferingId,
+        course_name: e.offering?.courseName || '',
+        course_code: e.offering?.courseCode || '',
+        class_name: e.offering?.classCode || '',
+        effective_sks: e.offering?.effectiveSks || 3,
+        sks: e.offering?.effectiveSks || 3,
+        day: e.dayName,
+        day_of_week: e.dayOfWeek,
+        start_time: e.startTime,
+        end_time: e.endTime,
+        start_minute: e.startMinute,
+        end_minute: e.endMinute,
+        room_name: e.roomName,
+        room_code: e.roomCode,
+        lecturer_names: e.offering?.primaryLecturerName ? [e.offering.primaryLecturerName] : [],
+        student_count: e.offering?.expectedStudents || 0,
+        term_id: activeTerm?.id || '',
+      }));
+      await generateLectureSchedulePDF(mapped as any, activeTerm);
+      toast.success('File PDF Jadwal Perkuliahan berhasil diunduh.');
+    } catch (err) {
+      toast.error('Gagal membuat PDF.');
+    }
+  };
+
+  const handleExportExcel = () => {
+    if (activeEntries.length === 0) {
+      toast.error('Tidak ada jadwal untuk diekspor.');
+      return;
+    }
+    try {
+      const mapped = activeEntries.map((e) => ({
+        id: e.courseOfferingId,
+        course_name: e.offering?.courseName || '',
+        course_code: e.offering?.courseCode || '',
+        class_name: e.offering?.classCode || '',
+        effective_sks: e.offering?.effectiveSks || 3,
+        sks: e.offering?.effectiveSks || 3,
+        day: e.dayName,
+        day_of_week: e.dayOfWeek,
+        start_time: e.startTime,
+        end_time: e.endTime,
+        start_minute: e.startMinute,
+        end_minute: e.endMinute,
+        room_name: e.roomName,
+        room_code: e.roomCode,
+        lecturer_names: e.offering?.primaryLecturerName ? [e.offering.primaryLecturerName] : [],
+        student_count: e.offering?.expectedStudents || 0,
+        term_id: activeTerm?.id || '',
+      }));
+      generateLectureScheduleExcel(mapped as any, activeTerm);
+      toast.success('File Excel (.xlsx) Jadwal Perkuliahan berhasil diunduh.');
+    } catch (err) {
+      toast.error('Gagal membuat Excel.');
+    }
+  };
+
+  const handleSaveSnapshot = async () => {
+    if (!version?.id) return;
+    setSavingSnapshot(true);
+    try {
+      const titleToUse = snapshotTitle.trim() || `Snapshot ${version.title || 'Jadwal'}`;
+      await scheduleVersionsService.saveSnapshotVersion(version.id, titleToUse);
+      toast.success(`Versi "${titleToUse}" berhasil disimpan ke Riwayat.`);
+      setShowSaveSnapshotModal(false);
+      setSnapshotTitle('');
+    } catch (err: any) {
+      toast.error(err.message || 'Gagal menyimpan versi ke Riwayat.');
+    } finally {
+      setSavingSnapshot(false);
+    }
+  };
 
   const handleOpenPublishModal = async () => {
     if (publishing) return;
@@ -1130,11 +1218,11 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
                   : 'bg-blue-50 text-blue-600 border-blue-200'
               )}
             >
-              {isPublished ? <CheckCircle2 className="w-6 h-6" /> : <Send className="w-6 h-6" />}
+              {isPublished ? <CheckCircle2 className="w-6 h-6" /> : <Sparkles className="w-6 h-6" />}
             </div>
             <div>
               <div className="flex items-center gap-2 flex-wrap">
-                <h2 className="text-lg font-bold text-slate-900">Preview & Publikasi Jadwal</h2>
+                <h2 className="text-lg font-bold text-slate-900">Tahap 3: Hasil Jadwal Perkuliahan</h2>
 
                 {/* Status Badge: Distinct Publication Readiness States */}
                 {isPublished ? (
@@ -1161,11 +1249,10 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
               </div>
 
               <p className="text-xs text-slate-500 mt-1 max-w-3xl leading-relaxed">
-                Tinjau hasil akhir penjadwalan, pastikan kelengkapan kelas dan validitas constraint, lalu terbitkan jadwal
-                perkuliahan resmi.
+                Review ringkasan hasil penyusunan dan optimasi jadwal. Klik tombol utama <strong>Lihat Jadwal Perkuliahan</strong> untuk membuka tampilan operasional lengkap (Tabel, Matriks, Filter, dan Smart Rescheduling).
               </p>
 
-              {/* 6 Required Header Indicators */}
+              {/* 4 Required Header Indicators */}
               <div className="flex items-center gap-2 flex-wrap mt-3 pt-3 border-t border-slate-100 text-xs">
                 {/* 1. Periode Akademik */}
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
@@ -1176,34 +1263,7 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
                   </span>
                 </div>
 
-                {/* 2. Versi */}
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
-                  <Layers className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-3xs text-slate-400 uppercase font-semibold">Versi:</span>
-                  <span className="font-bold text-slate-900">{version?.version_number || '1'}</span>
-                </div>
-
-                {/* 3. Revision */}
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
-                  <History className="w-3.5 h-3.5 text-slate-400" />
-                  <span className="text-3xs text-slate-400 uppercase font-semibold">Revision:</span>
-                  <span className="font-bold text-slate-900">{version?.revision ?? 1}</span>
-                </div>
-
-                {/* 4. Status */}
-                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
-                  <span className="text-3xs text-slate-400 uppercase font-semibold">Status:</span>
-                  <span
-                    className={cn(
-                      'font-bold px-1.5 py-0.2 rounded text-3xs',
-                      isPublished ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                    )}
-                  >
-                    {version?.status || 'DRAFT'}
-                  </span>
-                </div>
-
-                {/* 5. Jumlah Kelas (Terjadwal vs Scope) */}
+                {/* 2. Jumlah Kelas */}
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
                   <DoorOpen className="w-3.5 h-3.5 text-slate-400" />
                   <span className="text-3xs text-slate-400 uppercase font-semibold">Kelas:</span>
@@ -1212,7 +1272,7 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
                   </span>
                 </div>
 
-                {/* 6. Jumlah Konflik */}
+                {/* 3. Jumlah Konflik */}
                 <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
                   <span className="text-3xs text-slate-400 uppercase font-semibold">Konflik:</span>
                   <span
@@ -1221,7 +1281,16 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
                       conflicts.length === 0 ? 'text-emerald-600' : 'text-rose-600'
                     )}
                   >
-                    {conflicts.length} Konflik
+                    {conflicts.length === 0 ? '0 Konflik (Feasible)' : `${conflicts.length} Konflik`}
+                  </span>
+                </div>
+
+                {/* 4. Status Optimasi */}
+                <div className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-slate-700">
+                  <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+                  <span className="text-3xs text-slate-400 uppercase font-semibold">Status Optimasi:</span>
+                  <span className="font-bold text-slate-900">
+                    {optimizationMeta ? `Teroptimasi SA (${optimizationMeta.executionTimeMs} ms)` : 'Terjadwal'}
                   </span>
                 </div>
               </div>
@@ -1230,39 +1299,56 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
 
           {/* Quick Metrics & Actions */}
           <div className="flex items-center gap-2.5 flex-wrap shrink-0">
+            {/* AKSI UTAMA: Lihat Jadwal Perkuliahan */}
             <button
               type="button"
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
-              title="Perbarui Data & Validasi Backend"
+              onClick={() => navigate('/jadwal-perkuliahan')}
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold rounded-xl shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
             >
-              <RefreshCw className={cn('w-3.5 h-3.5', refreshing && 'animate-spin')} />
-              <span>Refresh</span>
+              <Calendar className="w-4 h-4" />
+              <span>Lihat Jadwal Perkuliahan</span>
+              <ArrowRight className="w-3.5 h-3.5" />
             </button>
 
+            {/* Unduh PDF */}
             <button
               type="button"
-              onClick={() => window.print()}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+              onClick={handleExportPDF}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold rounded-xl border border-slate-200 shadow-2xs transition-colors cursor-pointer"
             >
-              <Printer className="w-3.5 h-3.5" />
-              <span>Cetak</span>
+              <Download className="w-3.5 h-3.5 text-slate-500" />
+              <span>Unduh PDF</span>
             </button>
 
+            {/* Unduh Excel */}
             <button
               type="button"
-              onClick={() => navigate('/riwayat-jadwal')}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+              onClick={handleExportExcel}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-white hover:bg-slate-50 text-emerald-700 text-xs font-semibold rounded-xl border border-emerald-200 shadow-2xs transition-colors cursor-pointer"
             >
-              <History className="w-3.5 h-3.5" />
-              <span>Riwayat Jadwal</span>
+              <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Unduh Excel</span>
             </button>
 
+            {/* Simpan Versi */}
+            <button
+              type="button"
+              onClick={() => {
+                setSnapshotTitle(`Versi Revisi ${new Date().toLocaleDateString('id-ID')}`);
+                setShowSaveSnapshotModal(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+              title="Simpan snapshot versi ke Riwayat tanpa mengubah workspace"
+            >
+              <Save className="w-3.5 h-3.5 text-slate-500" />
+              <span>Simpan Versi</span>
+            </button>
+
+            {/* Tetapkan sebagai Final */}
             {isPublished ? (
               <span className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-50 text-emerald-800 text-xs font-bold rounded-xl border border-emerald-200">
-                <Lock className="w-3.5 h-3.5" />
-                Jadwal Read-Only
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                Jadwal Final Aktif
               </span>
             ) : (
               <button
@@ -1270,15 +1356,15 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
                 disabled={!checklist.isReadyToPublish || publishing}
                 onClick={handleOpenPublishModal}
                 className={cn(
-                  'inline-flex items-center gap-2 px-5 py-2.5 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer',
+                  'inline-flex items-center gap-2 px-4 py-2 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer',
                   checklist.isReadyToPublish && !publishing
                     ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 shadow-emerald-500/20'
                     : 'bg-slate-400 opacity-60 cursor-not-allowed'
                 )}
-                title={checklist.isReadyToPublish ? 'Terbitkan jadwal' : checklist.blockerMessage}
+                title={checklist.isReadyToPublish ? 'Tetapkan sebagai Final' : checklist.blockerMessage}
               >
-                <Send className="w-4 h-4" />
-                <span>{publishing ? 'Menerbitkan...' : 'Konfirmasi & Terbitkan Jadwal Resmi'}</span>
+                <CheckCircle2 className="w-4 h-4" />
+                <span>{publishing ? 'Menetapkan...' : 'Tetapkan Final'}</span>
               </button>
             )}
           </div>
@@ -1990,7 +2076,7 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
             </div>
 
             {/* Right: Navigation Controls */}
-            <div className="flex items-center gap-3 w-full sm:w-auto justify-end">
+            <div className="flex items-center gap-3 w-full sm:w-auto justify-end flex-wrap">
               <button
                 type="button"
                 onClick={onBackToStep5}
@@ -2000,20 +2086,31 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
                 <span>Kembali ke Optimasi SA</span>
               </button>
 
+              {/* AKSI UTAMA: Lihat Jadwal Perkuliahan */}
+              <button
+                type="button"
+                onClick={() => navigate('/jadwal-perkuliahan')}
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold rounded-xl shadow-sm shadow-blue-500/20 transition-all cursor-pointer"
+              >
+                <Calendar className="w-4 h-4" />
+                <span>Lihat Jadwal Perkuliahan</span>
+                <ArrowRight className="w-3.5 h-3.5" />
+              </button>
+
               {!isPublished && (
                 <button
                   type="button"
                   disabled={!checklist.isReadyToPublish || publishing}
                   onClick={handleOpenPublishModal}
                   className={cn(
-                    'inline-flex items-center gap-2 px-5 py-2.5 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer',
+                    'inline-flex items-center gap-2 px-4 py-2 text-white text-xs font-bold rounded-xl shadow-xs transition-all cursor-pointer',
                     checklist.isReadyToPublish && !publishing
                       ? 'bg-emerald-600 hover:bg-emerald-700 active:scale-98 shadow-emerald-500/20'
                       : 'bg-slate-700 text-slate-400 cursor-not-allowed opacity-70'
                   )}
                 >
                   <Send className="w-4 h-4" />
-                  <span>{publishing ? 'Menerbitkan...' : 'Konfirmasi & Terbitkan Jadwal Resmi'}</span>
+                  <span>{publishing ? 'Menerbitkan...' : 'Terbitkan Resmi'}</span>
                 </button>
               )}
             </div>
@@ -2022,6 +2119,56 @@ export const SchedulingPreviewPublishView: React.FC<SchedulingPreviewPublishView
       </div>
 
       {/* 6. Confirmation Modal: Publish Schedule Version */}
+      {showSaveSnapshotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">
+            <div className="w-12 h-12 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center mx-auto border border-blue-100">
+              <Save className="w-6 h-6" />
+            </div>
+
+            <div className="text-center space-y-1.5">
+              <h3 className="text-base font-bold text-slate-900">Simpan Versi Snapshot</h3>
+              <p className="text-xs text-slate-500 leading-relaxed">
+                Snapshot ini akan disimpan ke Riwayat Jadwal tanpa mengubah status Workspace atau jadwal aktif.
+              </p>
+            </div>
+
+            <div className="text-left space-y-1 pt-1">
+              <label className="text-3xs font-bold text-slate-700 uppercase tracking-wider">
+                Nama Versi
+              </label>
+              <input
+                type="text"
+                disabled={savingSnapshot}
+                value={snapshotTitle}
+                onChange={(e) => setSnapshotTitle(e.target.value)}
+                placeholder="Contoh: Versi 1 — Hasil Optimasi SA"
+                className="w-full px-3.5 py-2 text-xs border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-3 pt-2">
+              <button
+                type="button"
+                disabled={savingSnapshot}
+                onClick={() => setShowSaveSnapshotModal(false)}
+                className="flex-1 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-xl cursor-pointer"
+              >
+                Batal
+              </button>
+              <button
+                type="button"
+                disabled={savingSnapshot || !snapshotTitle.trim()}
+                onClick={handleSaveSnapshot}
+                className="flex-1 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold rounded-xl cursor-pointer disabled:opacity-50"
+              >
+                {savingSnapshot ? 'Menyimpan...' : 'Simpan ke Riwayat'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showPublishModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
           <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl space-y-4 border border-slate-200">

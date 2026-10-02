@@ -194,9 +194,8 @@ export const schedulingInitialService = {
         rooms = await roomsService.getRooms({ status: 'active' });
       } catch (e) {
         console.warn('Error fetching rooms for step 4, fallback query:', e);
-        const roomTable = isOwner ? 'rooms' : 'guest_rooms';
         const { data: rawRooms } = await supabase
-          .from(roomTable)
+          .from('rooms')
           .select('*')
           .eq('is_active', true)
           .order('capacity', { ascending: true });
@@ -209,9 +208,8 @@ export const schedulingInitialService = {
         timeSlots = await timeSlotsService.getTimeSlots({ activeOnly: true });
       } catch (e) {
         console.warn('Error fetching time slots for step 4, fallback query:', e);
-        const slotTable = isOwner ? 'time_slots' : 'guest_time_slots';
         const { data: rawSlots } = await supabase
-          .from(slotTable)
+          .from('time_slots')
           .select('*')
           .eq('is_active', true)
           .order('day_of_week', { ascending: true })
@@ -258,8 +256,8 @@ export const schedulingInitialService = {
         }
       } else {
         // Fallback: Query course offerings from Supabase
-        const offTable = isOwner ? 'course_offerings' : 'guest_course_offerings';
-        const lectTable = isOwner ? 'lecturers' : 'guest_lecturers';
+        const offTable = 'course_offerings';
+        const lectTable = 'lecturers';
 
         const [offRes, lectRes] = await Promise.all([
           supabase
@@ -820,37 +818,62 @@ export const schedulingInitialService = {
         }
       }
 
-      // 3. Prepare entries payload
-      const cleanEntries = entries.map((e) => ({
-        schedule_version_id: version!.id,
-        course_offering_id: e.courseOfferingId,
-        room_id: e.roomId,
-        day_of_week: Number(e.dayOfWeek),
-        start_minute: Number(e.startMinute),
-        end_minute: Number(e.endMinute),
-        session_count: Number(e.sessionCount),
-        course_name: e.offering.courseName,
-        course_code: e.offering.courseCode,
-        class_code: e.offering.classCode,
-        student_count: e.offering.expectedStudents,
-        room_capacity: e.roomCapacity,
-        // BACKEND PRIMARY LECTURER CONSISTENCY: PASS
-        lecturer_ids: [e.offering.primaryLecturerId],
-        lecturer_names: e.offering.primaryLecturerName,
-      }));
+      // 3. Save initial entries
+      let savedSuccessfully = false;
 
-      // Clear existing entries for this draft version via secure RPC
-      await scheduleVersionsService.clearDraftEntries(version.id);
+      // Primary approach: Use save_draft_entries RPC via scheduleVersionsService.saveDraft
+      try {
+        const draftPayload = entries.map((e) => ({
+          course_offering_id: e.courseOfferingId,
+          room_id: e.roomId,
+          day_of_week: Number(e.dayOfWeek),
+          start_minute: Number(e.startMinute),
+        }));
 
-      // Insert new initial entries
-      if (cleanEntries.length > 0) {
-        const { error: insertErr } = await supabase
-          .from('schedule_entries')
-          .insert(cleanEntries);
+        const saveRes = await scheduleVersionsService.saveDraft(
+          version.id,
+          version.revision,
+          draftPayload,
+          'JADWAL_AWAL'
+        );
+        if (saveRes.version) {
+          version = saveRes.version;
+        }
+        savedSuccessfully = true;
+      } catch (rpcErr) {
+        console.warn('save_draft_entries RPC in saveInitialSchedule failed, falling back to direct table insert:', rpcErr);
+      }
 
-        if (insertErr) {
-          console.error('Error inserting initial schedule_entries:', insertErr);
-          throw new Error(parseSupabaseError(insertErr));
+      // Fallback approach: Direct insert without generated column "end_minute"
+      if (!savedSuccessfully) {
+        const cleanEntries = entries.map((e) => ({
+          schedule_version_id: version!.id,
+          course_offering_id: e.courseOfferingId,
+          room_id: e.roomId,
+          day_of_week: Number(e.dayOfWeek),
+          start_minute: Number(e.startMinute),
+          session_count: Number(e.sessionCount),
+          course_name: e.offering.courseName,
+          course_code: e.offering.courseCode,
+          class_code: e.offering.classCode,
+          student_count: e.offering.expectedStudents,
+          room_capacity: e.roomCapacity,
+          lecturer_ids: [e.offering.primaryLecturerId],
+          lecturer_names: e.offering.primaryLecturerName,
+        }));
+
+        // Clear existing entries for this draft version
+        await scheduleVersionsService.clearDraftEntries(version.id);
+
+        if (cleanEntries.length > 0) {
+          const { error: insertErr } = await supabase
+            .from('schedule_entries')
+            .insert(cleanEntries);
+
+          if (insertErr) {
+            console.error('Error inserting initial schedule_entries:', insertErr);
+            throw new Error(parseSupabaseError(insertErr));
+          }
         }
       }
 
@@ -860,7 +883,7 @@ export const schedulingInitialService = {
 
       return {
         version: updatedVersion,
-        savedCount: cleanEntries.length,
+        savedCount: entries.length,
       };
     } catch (err: any) {
       console.error('[schedulingInitialService] saveInitialScheduleToSupabase error:', err);

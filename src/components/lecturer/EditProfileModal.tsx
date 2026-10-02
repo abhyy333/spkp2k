@@ -204,7 +204,7 @@ export const EditProfileModal: React.FC<EditProfileModalProps> = ({
 
   const displayName = lecturer.name || profile?.name || 'Dosen';
   const nip = lecturer.nip || '-';
-  const code = lecturer.lecturer_code || lecturer.code || '-';
+  const code = lecturer.lecturer_code || '-';
   const kbkName = lecturer.kbk?.name || 'Teknik Elektro';
   const hasAvatar = Boolean(previewUrl);
 

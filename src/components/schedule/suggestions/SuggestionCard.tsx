@@ -137,22 +137,58 @@ export const SuggestionCard: React.FC<SuggestionCardProps> = ({
           </div>
         </div>
 
-        {/* After */}
-        <div className="p-2.5 rounded-xl bg-emerald-50/50 border border-emerald-200 text-2xs space-y-1">
-          <span className="text-3xs font-bold uppercase tracking-wider text-emerald-700 block">
-            Rekomendasi Penyesuaian
-          </span>
-          <div className="flex items-center gap-1.5 text-slate-800 font-semibold">
-            <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-            <span>
-              {suggestion.proposedPlacement.dayName}, {suggestion.proposedPlacement.startTime} –{' '}
-              {suggestion.proposedPlacement.endTime}
+        {/* After / Rekomendasi */}
+        <div className="p-3 rounded-xl bg-emerald-50/60 border border-emerald-200 text-2xs space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-3xs font-bold uppercase tracking-wider text-emerald-800 block">
+              Rekomendasi Penyesuaian
+            </span>
+            <span
+              className={`px-2 py-0.5 rounded-full text-3xs font-bold ${
+                suggestion.impact.hardConflictFree
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  : 'bg-amber-100 text-amber-800 border border-amber-300'
+              }`}
+            >
+              {suggestion.impact.hardConflictFree ? 'Bebas Bentrok' : `+${suggestion.impact.newConflictsCount} Konflik`}
             </span>
           </div>
-          <div className="flex items-center gap-1.5 text-slate-800 font-semibold">
-            <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 pt-0.5">
+            <div className="flex items-center gap-1.5 text-slate-800 font-semibold">
+              <Clock className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>
+                {suggestion.proposedPlacement.dayName}, {suggestion.proposedPlacement.startTime} –{' '}
+                {suggestion.proposedPlacement.endTime}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-slate-800 font-semibold">
+              <MapPin className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+              <span>
+                {suggestion.proposedPlacement.roomCode} ({suggestion.proposedPlacement.roomName})
+              </span>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between text-3xs text-slate-600 pt-1 border-t border-emerald-200/60">
             <span>
-              {suggestion.proposedPlacement.roomCode} ({suggestion.proposedPlacement.roomName})
+              Kapasitas Ruang:{' '}
+              <strong className="text-slate-800">
+                {suggestion.proposedPlacement.roomCapacity
+                  ? `${suggestion.proposedPlacement.roomCapacity} Kursi`
+                  : 'Kapasitas Memadai'}
+              </strong>
+            </span>
+            <span>
+              Status Konflik:{' '}
+              <strong
+                className={
+                  suggestion.impact.hardConflictFree ? 'text-emerald-700' : 'text-amber-700'
+                }
+              >
+                {suggestion.impact.hardConflictFree ? 'Aman (0 Bentrok)' : 'Perlu Penyesuaian'}
+              </strong>
             </span>
           </div>
         </div>
@@ -220,7 +256,7 @@ export const SuggestionCard: React.FC<SuggestionCardProps> = ({
               className="inline-flex items-center gap-1 px-3 py-1.5 text-2xs font-bold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 rounded-lg transition-all shadow-2xs cursor-pointer disabled:opacity-50"
             >
               <Sparkles className="w-3 h-3" />
-              {isApplying ? 'Menerapkan...' : 'Terapkan Saran'}
+              {isApplying ? 'Menerapkan...' : 'Terapkan'}
             </button>
           </div>
         )}

@@ -1,7 +1,8 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { Course, CourseOffering, CourseType } from '../types';
 import { parseSupabaseError } from '../lib/utils';
-import { verifyOwnerAdmin, assertOwnerAdmin } from '../lib/authGuard';
+import { assertOwnerAdmin } from '../lib/authGuard';
+import { fetchWithCache, invalidateCache } from '../lib/queryCache';
 
 export const coursesService = {
   async getCourses(filters?: {
@@ -17,170 +18,88 @@ export const coursesService = {
       throw new Error('Koneksi database belum dikonfigurasi.');
     }
 
-    const isOwner = await verifyOwnerAdmin();
+    const cacheKey = `courses_${JSON.stringify(filters || {})}`;
 
-    if (!isOwner) {
-      // GUEST READ ONLY: Use guest_courses view with guest_kbk and guest_curriculums
-      let guestQuery = supabase
-        .from('guest_courses')
-        .select('*')
-        .order('semester', { ascending: true })
-        .order('code', { ascending: true, nullsFirst: false });
+    return fetchWithCache(
+      cacheKey,
+      async () => {
+        let query = supabase
+          .from('courses')
+          .select(`
+            id,
+            code,
+            name,
+            semester,
+            sks,
+            effective_sks,
+            course_type,
+            activity_type,
+            is_schedulable,
+            kbk_id,
+            curriculum_id,
+            kbk:kbk_id ( id, name, code ),
+            curriculum:curriculum_id ( id, name, year )
+          `)
+          .order('semester', { ascending: true })
+          .order('code', { ascending: true });
 
-      if (filters?.semester && filters.semester !== 'all') {
-        guestQuery = guestQuery.eq('semester', Number(filters.semester));
-      }
-      const targetType =
-        filters?.courseType && filters.courseType !== 'all'
-          ? filters.courseType
-          : filters?.category && filters.category !== 'all'
-          ? filters.category.toUpperCase()
-          : null;
-
-      if (targetType) {
-        guestQuery = guestQuery.eq('course_type', targetType);
-      }
-      if (filters?.kbkId && filters.kbkId !== 'all') {
-        guestQuery = guestQuery.eq('kbk_id', filters.kbkId);
-      }
-      if (filters?.curriculumId && filters.curriculumId !== 'all') {
-        guestQuery = guestQuery.eq('curriculum_id', filters.curriculumId);
-      }
-
-      const [coursesRes, kbkRes, currRes] = await Promise.all([
-        guestQuery,
-        supabase.from('guest_kbk').select('id, name, code'),
-        supabase.from('guest_curriculums').select('id, name, year'),
-      ]);
-
-      if (coursesRes.error) {
-        console.error('Error fetching guest courses:', coursesRes.error);
-        throw new Error(parseSupabaseError(coursesRes.error));
-      }
-
-      const kbkMap = new Map((kbkRes.data || []).map((k: any) => [k.id, k]));
-      const currMap = new Map((currRes.data || []).map((c: any) => [c.id, c]));
-
-      let results: Course[] = (coursesRes.data || []).map((row: any) => ({
-        ...row,
-        effective_sks: row.effective_sks ?? row.sks ?? 0,
-        sks: row.effective_sks ?? row.sks ?? 0,
-        course_type: row.course_type || 'WAJIB',
-        category: row.course_type === 'WAJIB' ? 'Wajib' : 'Pilihan',
-        offerings_count: 0,
-        kbk: kbkMap.get(row.kbk_id) || null,
-        curriculum: currMap.get(row.curriculum_id) || null,
-      }));
-
-      if (filters?.search) {
-        const s = filters.search.toLowerCase().trim();
-        results = results.filter(
-          (c) =>
-            (c.name && c.name.toLowerCase().includes(s)) ||
-            (c.code && c.code.toLowerCase().includes(s))
-        );
-      }
-
-      if (filters?.status && filters.status !== 'all') {
-        if (filters.status === 'schedulable') {
-          results = results.filter((c) => c.is_schedulable && c.activity_type !== 'KKN');
-        } else if (filters.status === 'unschedulable') {
-          results = results.filter((c) => !c.is_schedulable || c.activity_type === 'KKN');
+        if (filters?.semester && filters.semester !== 'all') {
+          query = query.eq('semester', Number(filters.semester));
         }
-      }
+        const targetType =
+          filters?.courseType && filters.courseType !== 'all'
+            ? filters.courseType
+            : filters?.category && filters.category !== 'all'
+            ? filters.category.toUpperCase()
+            : null;
 
-      return results;
-    }
+        if (targetType) {
+          query = query.eq('course_type', targetType);
+        }
+        if (filters?.kbkId && filters.kbkId !== 'all') {
+          query = query.eq('kbk_id', filters.kbkId);
+        }
+        if (filters?.curriculumId && filters.curriculumId !== 'all') {
+          query = query.eq('curriculum_id', filters.curriculumId);
+        }
 
-    // OWNER ADMIN: Query full courses table
-    let query = supabase
-      .from('courses')
-      .select(`
-        *,
-        kbk:kbk_id ( id, name, code ),
-        curriculum:curriculum_id ( id, name, year ),
-        course_offerings ( id )
-      `)
-      .order('semester', { ascending: true })
-      .order('code', { ascending: true, nullsFirst: false });
+        const { data, error } = await query;
 
-    if (filters?.semester && filters.semester !== 'all') {
-      query = query.eq('semester', Number(filters.semester));
-    }
-    const targetType =
-      filters?.courseType && filters.courseType !== 'all'
-        ? filters.courseType
-        : filters?.category && filters.category !== 'all'
-        ? filters.category.toUpperCase()
-        : null;
+        if (error) {
+          console.error('Error fetching courses:', error);
+          throw new Error(parseSupabaseError(error));
+        }
 
-    if (targetType) {
-      query = query.eq('course_type', targetType);
-    }
-    if (filters?.kbkId && filters.kbkId !== 'all') {
-      query = query.eq('kbk_id', filters.kbkId);
-    }
-    if (filters?.curriculumId && filters.curriculumId !== 'all') {
-      query = query.eq('curriculum_id', filters.curriculumId);
-    }
+        let results: Course[] = (data || []).map((row: any) => ({
+          ...row,
+          effective_sks: row.effective_sks ?? row.sks ?? 0,
+          sks: row.effective_sks ?? row.sks ?? 0,
+          course_type: row.course_type || 'WAJIB',
+          category: row.course_type === 'WAJIB' ? 'Wajib' : 'Pilihan',
+          offerings_count: 0,
+        }));
 
-    const { data: rawData, error } = await query;
-    if (error) {
-      console.error('Error fetching courses:', error);
-      throw new Error(parseSupabaseError(error));
-    }
+        if (filters?.search) {
+          const s = filters.search.toLowerCase().trim();
+          results = results.filter(
+            (c) =>
+              (c.name && c.name.toLowerCase().includes(s)) ||
+              (c.code && c.code.toLowerCase().includes(s))
+          );
+        }
 
-    // 12. COURSE MASTER FILTER: metadata->>'master_catalog' = 'true'
-    let data = rawData || [];
-    const hasMasterCatalogFlag = data.some(
-      (r: any) => r.metadata?.master_catalog === 'true' || r.metadata?.master_catalog === true
+        if (filters?.status && filters.status !== 'all') {
+          if (filters.status === 'schedulable') {
+            results = results.filter((c) => c.is_schedulable && c.activity_type !== 'KKN');
+          } else if (filters.status === 'unschedulable') {
+            results = results.filter((c) => !c.is_schedulable || c.activity_type === 'KKN');
+          }
+        }
+
+        return results;
+      },
+      { staleTimeMs: 10 * 60 * 1000 }
     );
-    if (hasMasterCatalogFlag) {
-      data = data.filter(
-        (r: any) => r.metadata?.master_catalog === 'true' || r.metadata?.master_catalog === true
-      );
-    }
-
-    let results: Course[] = data.map((row: any) => ({
-      ...row,
-      effective_sks: row.effective_sks ?? row.sks ?? 0,
-      sks: row.effective_sks ?? row.sks ?? 0,
-      course_type: row.course_type || 'WAJIB',
-      category: row.course_type === 'WAJIB' ? 'Wajib' : 'Pilihan',
-      offerings_count: row.course_offerings?.length || 0,
-    }));
-
-    if (filters?.search) {
-      const s = filters.search.toLowerCase().trim();
-      results = results.filter(
-        (c) =>
-          (c.name && c.name.toLowerCase().includes(s)) ||
-          (c.code && c.code.toLowerCase().includes(s))
-      );
-    }
-
-    if (filters?.status && filters.status !== 'all') {
-      if (filters.status === 'schedulable') {
-        results = results.filter((c) => c.is_schedulable && c.activity_type !== 'KKN');
-      } else if (filters.status === 'unschedulable') {
-        results = results.filter((c) => !c.is_schedulable || c.activity_type === 'KKN');
-      }
-    }
-
-    // Sort: semester ASC, lalu kurikulum (2022, 2026), lalu code ASC
-    results.sort((a, b) => {
-      if ((a.semester || 0) !== (b.semester || 0)) {
-        return (a.semester || 0) - (b.semester || 0);
-      }
-      const yearA = a.curriculum?.year || 0;
-      const yearB = b.curriculum?.year || 0;
-      if (yearA !== yearB) {
-        return yearA - yearB;
-      }
-      return (a.code || '').localeCompare(b.code || '');
-    });
-
-    return results;
   },
 
   async getCourseById(id: string): Promise<{
@@ -378,29 +297,37 @@ export const coursesService = {
 
   async getCurriculums() {
     if (!isSupabaseConfigured()) return [];
-    try {
-      const isOwner = await verifyOwnerAdmin();
-      const table = isOwner ? 'curriculums' : 'guest_curriculums';
-      const { data } = await supabase
-        .from(table)
-        .select('*')
-        .order('year', { ascending: false });
-      return data || [];
-    } catch {
-      return [];
-    }
+    return fetchWithCache(
+      'curriculums_master',
+      async () => {
+        try {
+          const { data } = await supabase
+            .from('curriculums')
+            .select('*')
+            .order('year', { ascending: false });
+          return data || [];
+        } catch {
+          return [];
+        }
+      },
+      { staleTimeMs: 15 * 60 * 1000 }
+    );
   },
 
   async getKBKs() {
     if (!isSupabaseConfigured()) return [];
-    try {
-      const isOwner = await verifyOwnerAdmin();
-      const table = isOwner ? 'kbk' : 'guest_kbk';
-      const { data } = await supabase.from(table).select('*').order('name', { ascending: true });
-      return data || [];
-    } catch {
-      return [];
-    }
+    return fetchWithCache(
+      'kbk_master',
+      async () => {
+        try {
+          const { data } = await supabase.from('kbk').select('*').order('name', { ascending: true });
+          return data || [];
+        } catch {
+          return [];
+        }
+      },
+      { staleTimeMs: 15 * 60 * 1000 }
+    );
   },
 
   async getStats() {
@@ -408,52 +335,41 @@ export const coursesService = {
       return { total: 0, schedulable: 0, wajib: 0, pilihan: 0, totalClasses: 0 };
     }
 
-    try {
-      const isOwner = await verifyOwnerAdmin();
-      const table = isOwner ? 'courses' : 'guest_courses';
+    return fetchWithCache(
+      'course_stats',
+      async () => {
+        try {
+          const [coursesRes, offeringsRes] = await Promise.all([
+            supabase.from('courses').select('id, course_type, is_schedulable, activity_type, metadata'),
+            supabase.from('course_offerings').select('*', { count: 'exact', head: true }),
+          ]);
 
-      let { data: courses, error } = await supabase
-        .from(table)
-        .select('id, course_type, is_schedulable, activity_type, metadata');
+          const courses = coursesRes.data || [];
+          const classesCount = offeringsRes.count || 0;
 
-      if (error) {
-        const guestRes = await supabase
-          .from('guest_courses')
-          .select('id, course_type, is_schedulable, activity_type, metadata');
-        courses = guestRes.data || [];
-      }
+          const masterCourses = courses.filter(
+            (c) => c.metadata?.master_catalog === true || c.metadata?.master_catalog === 'true'
+          );
+          const catalogList = masterCourses.length > 0 ? masterCourses : courses;
 
-      let classesCount = 0;
-      try {
-        const { count } = await supabase
-          .from('course_offerings')
-          .select('*', { count: 'exact', head: true });
-        classesCount = count || 0;
-      } catch {
-        // ignore
-      }
+          const total = catalogList.length;
+          const schedulable = catalogList.filter((c) => c.is_schedulable && c.activity_type !== 'KKN').length;
+          const wajib = catalogList.filter((c) => c.course_type === 'WAJIB').length;
+          const pilihan = catalogList.filter((c) => c.course_type === 'PILIHAN').length;
 
-      // Master catalog filter: only count metadata->>'master_catalog' = 'true'
-      const masterCourses = (courses || []).filter(
-        (c) => c.metadata?.master_catalog === true || c.metadata?.master_catalog === 'true'
-      );
-      const catalogList = masterCourses.length > 0 ? masterCourses : (courses || []);
-
-      const total = catalogList.length;
-      const schedulable = catalogList.filter((c) => c.is_schedulable && c.activity_type !== 'KKN').length;
-      const wajib = catalogList.filter((c) => c.course_type === 'WAJIB').length;
-      const pilihan = catalogList.filter((c) => c.course_type === 'PILIHAN').length;
-
-      return {
-        total,
-        schedulable,
-        wajib,
-        pilihan,
-        totalClasses: classesCount || 0,
-      };
-    } catch (err) {
-      console.warn('Failed to get course stats:', err);
-      return { total: 0, schedulable: 0, wajib: 0, pilihan: 0, totalClasses: 0 };
-    }
+          return {
+            total,
+            schedulable,
+            wajib,
+            pilihan,
+            totalClasses: classesCount || 0,
+          };
+        } catch (err) {
+          console.warn('Failed to get course stats:', err);
+          return { total: 0, schedulable: 0, wajib: 0, pilihan: 0, totalClasses: 0 };
+        }
+      },
+      { staleTimeMs: 5 * 60 * 1000 }
+    );
   },
 };

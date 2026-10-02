@@ -1187,8 +1187,8 @@ export const UnifiedSchedulingPage: React.FC = () => {
 
     // Move to Step 2 and load Rombel data
     setActiveStep(2);
-    await loadRombelData(plannedCourses);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+    await loadRombelData(plannedCourses);
   };
 
   // Handler: Back to Step 1
@@ -2058,7 +2058,7 @@ export const UnifiedSchedulingPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  // Continue to Step 4 (Strictly validate and open Step 4)
+  // Continue to Step 4 (Jadwal Awal)
   const handleContinueToStep4 = async () => {
     if (!step3Data?.isAllValid) {
       toast.error('Masih ada rombel yang belum memiliki dosen pengampu aktif.');
@@ -2073,7 +2073,7 @@ export const UnifiedSchedulingPage: React.FC = () => {
   // Continue to Step 5 (Simulated Annealing Optimization)
   const handleContinueToStep5 = () => {
     if (step4Entries.length === 0) {
-      toast.error('Belum ada jadwal awal yang digenerate pada Tahap 4.');
+      toast.error('Belum ada jadwal awal yang digenerate.');
       return;
     }
 
@@ -2144,7 +2144,7 @@ export const UnifiedSchedulingPage: React.FC = () => {
       );
 
       toast.success(
-        `Hasil optimasi berhasil disimpan ke draft database (${res.savedCount} kelas). Siap ditinjau pada Tahap 6.`
+        `Hasil optimasi berhasil disimpan ke draft database (${res.savedCount} kelas). Siap ditinjau pada Hasil Jadwal.`
       );
     } catch (err: any) {
       console.error('Save step 5 error:', err);

@@ -57,6 +57,7 @@ export function generateCandidateMoves(params: {
     endTime: entry.end_time || minuteToTime(entry.end_minute ?? (entry.start_minute ?? (isRamadanSlot ? 480 : 470)) + duration),
     roomCode: currentRoom?.code || '-',
     roomName: currentRoom?.name || '-',
+    roomCapacity: currentRoom?.capacity,
   };
 
   // Group active time slots by day
@@ -141,6 +142,7 @@ export function generateCandidateMoves(params: {
           roomId: r.id,
           roomCode: r.code,
           roomName: r.name,
+          roomCapacity: r.capacity,
         },
       });
     }
@@ -186,6 +188,7 @@ export function generateCandidateMoves(params: {
               endTime: minuteToTime(endMin),
               roomCode: currentRoom.code,
               roomName: currentRoom.name,
+              roomCapacity: currentRoom.capacity,
             },
           });
         }
@@ -238,6 +241,7 @@ export function generateCandidateMoves(params: {
               endTime: minuteToTime(endMin),
               roomCode: r.code,
               roomName: r.name,
+              roomCapacity: r.capacity,
             },
           });
         }
@@ -285,6 +289,7 @@ export function generateCandidateMoves(params: {
           endTime: minuteToTime(otherEnd),
           roomCode: otherRoom?.code || '-',
           roomName: otherRoom?.name || '-',
+          roomCapacity: otherRoom?.capacity,
         },
         swapTargetEntry: other,
         swapTargetPlacement: {
@@ -297,6 +302,7 @@ export function generateCandidateMoves(params: {
           endTime: currentPlacement.endTime,
           roomCode: currentPlacement.roomCode,
           roomName: currentPlacement.roomName,
+          roomCapacity: currentPlacement.roomCapacity,
         },
       });
     }

@@ -19,7 +19,7 @@ export const AcademicTermProvider: React.FC<{ children: React.ReactNode }> = ({ 
   const [activeTermLoading, setActiveTermLoading] = useState<boolean>(true);
   const [activeTermError, setActiveTermError] = useState<string | null>(null);
 
-  const fetchActiveTerm = useCallback(async () => {
+  const fetchActiveTerm = useCallback(async (forceRefresh = false) => {
     try {
       setActiveTermLoading(true);
       setActiveTermError(null);
@@ -42,7 +42,7 @@ export const AcademicTermProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, []);
 
-  const fetchTerms = useCallback(async () => {
+  const fetchTerms = useCallback(async (_forceRefresh = false) => {
     try {
       const allTerms = await academicTermsService.getAcademicTerms();
       setTerms(allTerms);
@@ -51,7 +51,7 @@ export const AcademicTermProvider: React.FC<{ children: React.ReactNode }> = ({ 
     }
   }, []);
 
-  // Initial independent load of academic term and terms list
+  // Initial load: ONLY load active term (1 query, cached)
   useEffect(() => {
     let mounted = true;
 
@@ -59,23 +59,12 @@ export const AcademicTermProvider: React.FC<{ children: React.ReactNode }> = ({ 
       try {
         setActiveTermLoading(true);
         setActiveTermError(null);
-        const [term, allTerms] = await Promise.all([
-          getActiveAcademicTerm().catch((err) => {
-            console.warn('getActiveAcademicTerm init catch:', err);
-            return null;
-          }),
-          academicTermsService.getAcademicTerms().catch((err) => {
-            console.warn('getAcademicTerms init catch:', err);
-            return [];
-          }),
-        ]);
-
+        const term = await getActiveAcademicTerm();
         if (mounted) {
           if (term) {
             setActiveTerm(term);
           } else {
-            // fallback to first active or first available term
-            const fallback = allTerms.find((t) => t.is_active) || allTerms[0] || {
+            setActiveTerm({
               id: 'default-active-term',
               academic_year: '2026/2027',
               semester_type: 'GANJIL',
@@ -84,14 +73,12 @@ export const AcademicTermProvider: React.FC<{ children: React.ReactNode }> = ({ 
               ends_on: null,
               year: '2026/2027',
               term: 'GANJIL',
-            };
-            setActiveTerm(fallback);
+            });
           }
-          setTerms(allTerms);
         }
       } catch (err: any) {
         if (mounted) {
-          console.warn('Academic term initialization error handled:', err);
+          console.warn('Academic term initialization notice:', err);
           setActiveTerm({
             id: 'default-active-term',
             academic_year: '2026/2027',
@@ -123,8 +110,8 @@ export const AcademicTermProvider: React.FC<{ children: React.ReactNode }> = ({ 
       terms,
       activeTermLoading,
       activeTermError,
-      refetchActiveTerm: fetchActiveTerm,
-      refetchTerms: fetchTerms,
+      refetchActiveTerm: () => fetchActiveTerm(true),
+      refetchTerms: () => fetchTerms(true),
     }),
     [activeTerm, terms, activeTermLoading, activeTermError, fetchActiveTerm, fetchTerms]
   );
@@ -143,3 +130,4 @@ export function useAcademicTerm(): AcademicTermContextType {
   }
   return context;
 }
+

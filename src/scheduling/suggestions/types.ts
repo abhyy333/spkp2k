@@ -21,6 +21,7 @@ export interface ProposedPlacement {
   endTime: string;
   roomCode: string;
   roomName: string;
+  roomCapacity?: number;
 }
 
 export interface ProposedSwapChange {

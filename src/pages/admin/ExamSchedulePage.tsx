@@ -22,6 +22,7 @@ import {
   Loader2,
   FileText,
   EyeOff,
+  FileSpreadsheet,
 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { StatCard } from '../../components/ui/StatCard';
@@ -32,6 +33,7 @@ import { ErrorState } from '../../components/ui/ErrorState';
 import { toast } from '../../components/ui/Toast';
 import { DocumentExportModal } from '../../components/documents/DocumentExportModal';
 import { generateExamSchedulePDF } from '../../lib/pdf/pdfGenerator';
+import { generateExamScheduleExcel } from '../../lib/excel/excelGenerator';
 import { ClearActiveScheduleModal } from '../../components/admin/settings/ClearActiveScheduleModal';
 
 import { useAuth } from '../../contexts/AuthContext';
@@ -280,8 +282,13 @@ export const ExamSchedulePage: React.FC = () => {
           return next;
         });
       } catch (err: any) {
-        console.error('Error loading exam source offerings:', err);
-        toast.error(err.message || 'Gagal memuat mata kuliah ujian dari jadwal perkuliahan.');
+        console.warn('Notice loading exam source offerings:', err);
+        const errMsg = err?.message || '';
+        if (errMsg.includes('PUBLISHED_LECTURE_SCHEDULE_REQUIRED')) {
+          toast.info('Jadwal perkuliahan resmi belum diterbitkan. Sistem memuat mata kuliah langsung dari kurikulum aktif semester ini.');
+        } else {
+          toast.error(err.message || 'Gagal memuat mata kuliah ujian.');
+        }
       } finally {
         setLoadingSourceOfferings(false);
       }
@@ -869,6 +876,22 @@ export const ExamSchedulePage: React.FC = () => {
                       <span>Unduh PDF</span>
                     </>
                   )}
+                </button>
+
+                {/* Unduh Excel (.xlsx) */}
+                <button
+                  type="button"
+                  disabled={publishedExams.length === 0}
+                  onClick={() => {
+                    if (publishedExams.length === 0) return;
+                    generateExamScheduleExcel(filteredPublishedExams.length > 0 ? filteredPublishedExams : publishedExams, activeTerm, examType);
+                    toast.success(`File Excel Jadwal ${examType} berhasil diunduh.`);
+                  }}
+                  title={`Unduh Excel Jadwal ${examType}`}
+                  className="inline-flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors shadow-2xs cursor-pointer disabled:opacity-50"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>Unduh Excel</span>
                 </button>
 
                 {/* Cetak & Format Dokumen */}

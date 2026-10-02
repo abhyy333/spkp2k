@@ -1,7 +1,8 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { TimeSlot } from '../types';
 import { minuteToTime, timeToMinute, dayOfWeekToName, parseSupabaseError } from '../lib/utils';
-import { verifyOwnerAdmin, assertOwnerAdmin } from '../lib/authGuard';
+import { assertOwnerAdmin } from '../lib/authGuard';
+import { fetchWithCache, invalidateCache } from '../lib/queryCache';
 
 export const timeSlotsService = {
   async getTimeSlots(filters?: { termId?: string; day?: number; activeOnly?: boolean }): Promise<TimeSlot[]> {
@@ -9,51 +10,56 @@ export const timeSlotsService = {
       return [];
     }
 
-    try {
-      const isOwner = await verifyOwnerAdmin();
-      const table = isOwner ? 'time_slots' : 'guest_time_slots';
+    const cacheKey = `time_slots_${JSON.stringify(filters || {})}`;
 
-      let query = supabase
-        .from(table)
-        .select('*')
-        .order('day_of_week', { ascending: true })
-        .order('start_minute', { ascending: true });
+    return fetchWithCache(
+      cacheKey,
+      async () => {
+        try {
+          let query = supabase
+            .from('time_slots')
+            .select('*')
+            .order('day_of_week', { ascending: true })
+            .order('start_minute', { ascending: true });
 
-      if (filters?.day) {
-        query = query.eq('day_of_week', filters.day);
-      }
-      if (filters?.activeOnly) {
-        query = query.eq('is_active', true);
-      }
+          if (filters?.day) {
+            query = query.eq('day_of_week', filters.day);
+          }
+          if (filters?.activeOnly) {
+            query = query.eq('is_active', true);
+          }
 
-      const { data, error } = await query;
-      if (error) {
-        console.warn('Error fetching time slots:', error);
-        throw new Error(parseSupabaseError(error));
-      }
+          const { data, error } = await query;
+          if (error) {
+            console.warn('Error fetching time slots:', error);
+            throw new Error(parseSupabaseError(error));
+          }
 
-      return (data || []).map((row: any) => {
-        const startMin = row.start_minute ?? (row.start_time ? timeToMinute(row.start_time) : 480);
-        const endMin = row.end_minute ?? (row.end_time ? timeToMinute(row.end_time) : 530);
-        const dayNum = row.day_of_week ?? (row.day ? 1 : 1);
-        const dur = endMin - startMin;
+          return (data || []).map((row: any) => {
+            const startMin = row.start_minute ?? (row.start_time ? timeToMinute(row.start_time) : 480);
+            const endMin = row.end_minute ?? (row.end_time ? timeToMinute(row.end_time) : 530);
+            const dayNum = row.day_of_week ?? (row.day ? 1 : 1);
+            const dur = endMin - startMin;
 
-        return {
-          ...row,
-          day_of_week: dayNum,
-          start_minute: startMin,
-          end_minute: endMin,
-          day: dayOfWeekToName(dayNum),
-          start_time: minuteToTime(startMin),
-          end_time: minuteToTime(endMin),
-          duration_minutes: dur > 0 ? dur : 50,
-          slot_type: row.label || `Perkuliahan (${Math.round(dur / 50)} SKS)`,
-        };
-      });
-    } catch (err) {
-      console.error('Time slots query error:', err);
-      return [];
-    }
+            return {
+              ...row,
+              day_of_week: dayNum,
+              start_minute: startMin,
+              end_minute: endMin,
+              day: dayOfWeekToName(dayNum),
+              start_time: minuteToTime(startMin),
+              end_time: minuteToTime(endMin),
+              duration_minutes: dur > 0 ? dur : 50,
+              slot_type: row.label || `Perkuliahan (${Math.round(dur / 50)} SKS)`,
+            };
+          });
+        } catch (err) {
+          console.error('Time slots query error:', err);
+          return [];
+        }
+      },
+      { staleTimeMs: 15 * 60 * 1000 }
+    );
   },
 
   async createTimeSlot(data: {

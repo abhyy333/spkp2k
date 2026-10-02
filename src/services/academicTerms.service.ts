@@ -113,8 +113,7 @@ export const academicTermsService = {
       const { data, error } = await supabase
         .from(table)
         .select('*')
-        .order('academic_year', { ascending: false, nullsFirst: false })
-        .order('created_at', { ascending: false });
+        .order('academic_year', { ascending: false, nullsFirst: false });
 
       if (error) {
         console.warn('Academic terms error:', error);

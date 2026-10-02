@@ -22,7 +22,8 @@ export const SchedulingStickyBar: React.FC<SchedulingStickyBarProps> = ({
 }) => {
   if (selectedCount === 0) return null;
 
-  const handleButtonClick = () => {
+  const handleButtonClick = (e: React.MouseEvent<HTMLButtonElement>) => {
+    e.preventDefault();
     if (hasInvalidParticipants) {
       toast.error('Isi jumlah peserta untuk seluruh mata kuliah teori yang dipilih.');
       // Find first invalid input on page

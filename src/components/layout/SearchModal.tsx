@@ -157,7 +157,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
                   >
                     <div className="flex items-center gap-3 min-w-0">
                       <div className="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 font-bold text-xs">
-                        {l.code || 'DS'}
+                        {l.lecturer_code || 'DS'}
                       </div>
                       <div className="truncate">
                         <p className="text-xs font-semibold text-slate-800 truncate">{l.name}</p>
@@ -198,7 +198,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({ isOpen, onClose }) => 
                           {r.name} ({r.code})
                         </p>
                         <p className="text-2xs text-slate-400">
-                          {r.building} • Kapasitas {r.capacity} orang
+                          {r.room_type || 'Ruang Kuliah'} • Kapasitas {r.capacity} orang
                         </p>
                       </div>
                     </div>

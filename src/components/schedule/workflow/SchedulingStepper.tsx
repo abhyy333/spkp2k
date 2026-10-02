@@ -1,60 +1,56 @@
 import React from 'react';
 import {
-  CheckCircle2,
   BookOpen,
-  Users,
-  UserCheck,
-  Calendar,
   Sparkles,
-  Send,
-  Lock,
+  CheckCircle2,
+  ChevronRight,
 } from 'lucide-react';
 import { cn } from '../../../lib/utils';
 import { toast } from '../../ui/Toast';
 
-export interface StepItem {
-  number: number;
+export interface SubStepItem {
+  step: number;
+  label: string;
+}
+
+export interface MainStageItem {
+  stageNumber: number;
   title: string;
   subtitle: string;
   icon: React.ReactNode;
+  subSteps: SubStepItem[];
 }
 
-const STEPS: StepItem[] = [
+const MAIN_STAGES: MainStageItem[] = [
   {
-    number: 1,
-    title: 'Pemilihan Mata Kuliah',
-    subtitle: 'Pilih Paket & Mata Kuliah',
+    stageNumber: 1,
+    title: 'Persiapan Perkuliahan',
+    subtitle: 'MK, Rombel & Dosen',
     icon: <BookOpen className="w-4 h-4" />,
+    subSteps: [
+      { step: 1, label: 'Pemilihan MK' },
+      { step: 2, label: 'Pembagian Rombel' },
+      { step: 3, label: 'Penugasan Dosen' },
+    ],
   },
   {
-    number: 2,
-    title: 'Pembagian Rombel',
-    subtitle: 'Review Kelas',
-    icon: <Users className="w-4 h-4" />,
-  },
-  {
-    number: 3,
-    title: 'Penugasan Dosen',
-    subtitle: 'Dosen Pengampu',
-    icon: <UserCheck className="w-4 h-4" />,
-  },
-  {
-    number: 4,
-    title: 'Generate Jadwal Awal',
-    subtitle: 'Ruangan & Sesi Waktu',
-    icon: <Calendar className="w-4 h-4" />,
-  },
-  {
-    number: 5,
-    title: 'Optimasi Simulated Annealing',
-    subtitle: 'Eliminasi Bentrok',
+    stageNumber: 2,
+    title: 'Penyusunan & Optimasi',
+    subtitle: 'Jadwal Awal & Simulated Annealing',
     icon: <Sparkles className="w-4 h-4" />,
+    subSteps: [
+      { step: 4, label: 'Jadwal Awal' },
+      { step: 5, label: 'Optimasi SA' },
+    ],
   },
   {
-    number: 6,
-    title: 'Preview & Publikasi',
-    subtitle: 'Review & Terbitkan',
-    icon: <Send className="w-4 h-4" />,
+    stageNumber: 3,
+    title: 'Hasil Jadwal',
+    subtitle: 'Review & Kelola',
+    icon: <CheckCircle2 className="w-4 h-4" />,
+    subSteps: [
+      { step: 6, label: 'Review & Kelola' },
+    ],
   },
 ];
 
@@ -67,97 +63,98 @@ export const SchedulingStepper: React.FC<SchedulingStepperProps> = React.memo(({
   currentStep = 1,
   onStepClick,
 }) => {
-  const handleStepClick = (stepNumber: number) => {
-    if (stepNumber === currentStep) return;
-    if (stepNumber > currentStep) {
+  // Map internal step (1..6) to main stage (1..3)
+  const currentMainStage = currentStep <= 3 ? 1 : currentStep <= 5 ? 2 : 3;
+
+  const handleStepClick = (targetStep: number) => {
+    if (targetStep === currentStep) return;
+    if (targetStep > currentStep) {
       toast.info('Selesaikan tahap sebelumnya terlebih dahulu.');
       return;
     }
     if (onStepClick) {
-      onStepClick(stepNumber);
+      onStepClick(targetStep);
     }
   };
 
+  const handleStageClick = (stage: MainStageItem) => {
+    if (stage.stageNumber === currentMainStage) return;
+
+    if (stage.stageNumber > currentMainStage) {
+      toast.info('Selesaikan tahap sebelumnya terlebih dahulu.');
+      return;
+    }
+
+    // When jumping to an earlier stage, default to its first sub-step or current active
+    const targetFirstStep = stage.subSteps[0].step;
+    if (onStepClick) {
+      onStepClick(targetFirstStep);
+    }
+  };
+
+  // Find active stage object to render sub-steps
+  const activeStageObj = MAIN_STAGES.find((s) => s.stageNumber === currentMainStage);
+
   return (
-    <div
-      className="w-full p-2.5 shadow-[0_4px_16px_rgba(15,23,42,0.03)]"
-      style={{
-        background: 'rgba(255, 255, 255, 0.82)',
-        backdropFilter: 'blur(12px) saturate(130%)',
-        WebkitBackdropFilter: 'blur(12px) saturate(130%)',
-        border: '1px solid rgba(255, 255, 255, 0.85)',
-        borderRadius: '20px',
-      }}
-    >
+    <div className="w-full bg-white rounded-2xl border border-slate-200/90 shadow-2xs p-3.5 space-y-3">
+      {/* Top: 3 Main Stages Header */}
       <div className="overflow-x-auto pb-1 -mb-1">
-        <ol className="flex items-center min-w-[760px] lg:min-w-full justify-between gap-1.5">
-          {STEPS.map((step, idx) => {
-            const isActive = step.number === currentStep;
-            const isCompleted = step.number < currentStep;
-            const isLocked = step.number > currentStep;
+        <ol className="flex items-center min-w-[560px] md:min-w-full justify-between gap-2">
+          {MAIN_STAGES.map((stage, idx) => {
+            const isStageActive = stage.stageNumber === currentMainStage;
+            const isStageCompleted = stage.stageNumber < currentMainStage;
+            const isClickable = isStageCompleted || isStageActive;
 
             return (
-              <React.Fragment key={step.number}>
-                <li className="flex-1">
-                  <button
-                    type="button"
-                    onClick={() => handleStepClick(step.number)}
-                    className={cn(
-                      'w-full flex items-center gap-2.5 p-2 rounded-xl text-left transition-all group',
-                      isActive && 'bg-blue-50/80 border border-blue-200/80 shadow-2xs',
-                      isCompleted && 'hover:bg-slate-50 cursor-pointer',
-                      isLocked && 'cursor-not-allowed opacity-75 hover:opacity-90'
-                    )}
-                  >
-                    <div
-                      className={cn(
-                        'w-7 h-7 rounded-lg flex items-center justify-center shrink-0 text-xs font-bold transition-colors',
-                        isActive && 'bg-blue-600 text-white shadow-2xs shadow-blue-500/30',
-                        isCompleted && 'bg-emerald-600 text-white',
-                        isLocked && 'bg-slate-100 text-slate-400 group-hover:bg-slate-200/70'
-                      )}
-                    >
-                      {isCompleted ? (
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                      ) : isLocked ? (
-                        <Lock className="w-3 h-3 text-slate-400" />
-                      ) : (
-                        step.icon
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className={cn(
-                            'text-4xs font-bold uppercase tracking-wider',
-                            isActive ? 'text-blue-600' : isCompleted ? 'text-emerald-600' : 'text-slate-400'
-                          )}
-                        >
-                          Tahap {step.number}
-                        </span>
-                        {isActive && (
-                          <span className="inline-flex items-center px-1.5 py-0.2 rounded text-4xs font-semibold bg-blue-100 text-blue-700">
-                            Aktif
-                          </span>
-                        )}
-                      </div>
-                      <p
-                        className={cn(
-                          'text-xs font-semibold truncate',
-                          isActive ? 'text-slate-900 font-bold' : isCompleted ? 'text-slate-800' : 'text-slate-500'
-                        )}
-                        title={step.title}
-                      >
-                        {step.title}
-                      </p>
-                    </div>
-                  </button>
-                </li>
-                {idx < STEPS.length - 1 && (
+              <React.Fragment key={stage.stageNumber}>
+                <li
+                  onClick={() => isClickable && handleStageClick(stage)}
+                  className={cn(
+                    'flex-1 flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-all select-none border',
+                    isClickable ? 'cursor-pointer' : 'cursor-not-allowed opacity-60',
+                    isStageActive
+                      ? 'bg-blue-50/80 border-blue-300 shadow-2xs'
+                      : isStageCompleted
+                      ? 'bg-slate-50/70 border-slate-200 hover:bg-slate-100/80'
+                      : 'bg-slate-50/40 border-slate-100'
+                  )}
+                >
                   <div
                     className={cn(
-                      'hidden xl:block w-3 h-0.5 shrink-0 rounded-full mx-0.5',
-                      step.number < currentStep ? 'bg-emerald-300' : 'bg-slate-200'
+                      'w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold transition-all shrink-0 shadow-2xs',
+                      isStageActive && 'bg-blue-600 text-white shadow-blue-500/20',
+                      isStageCompleted && 'bg-emerald-600 text-white',
+                      !isStageActive && !isStageCompleted && 'bg-slate-200 text-slate-500'
+                    )}
+                  >
+                    {isStageCompleted ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <span>{stage.stageNumber}</span>
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className={cn(
+                        'text-xs font-bold leading-tight truncate',
+                        isStageActive && 'text-blue-950',
+                        isStageCompleted && 'text-slate-800',
+                        !isStageActive && !isStageCompleted && 'text-slate-500'
+                      )}
+                    >
+                      {stage.title}
+                    </p>
+                    <p className="text-3xs text-slate-500 font-medium truncate mt-0.5">
+                      {stage.subtitle}
+                    </p>
+                  </div>
+                </li>
+
+                {idx < MAIN_STAGES.length - 1 && (
+                  <div
+                    className={cn(
+                      'h-0.5 w-6 shrink-0 rounded-full transition-colors hidden sm:block',
+                      stage.stageNumber < currentMainStage ? 'bg-emerald-400' : 'bg-slate-200'
                     )}
                   />
                 )}
@@ -166,6 +163,61 @@ export const SchedulingStepper: React.FC<SchedulingStepperProps> = React.memo(({
           })}
         </ol>
       </div>
+
+      {/* Bottom: Sub-Step Navigation Pills for the Active Stage */}
+      {activeStageObj && activeStageObj.subSteps.length > 1 && (
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 text-3xs font-semibold text-slate-500">
+            <span>Alur {activeStageObj.title}:</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {activeStageObj.subSteps.map((sub, sIdx) => {
+              const isSubActive = sub.step === currentStep;
+              const isSubCompleted = sub.step < currentStep;
+              const isSubClickable = isSubCompleted || isSubActive;
+
+              return (
+                <React.Fragment key={sub.step}>
+                  <button
+                    type="button"
+                    onClick={() => isSubClickable && handleStepClick(sub.step)}
+                    disabled={!isSubClickable}
+                    className={cn(
+                      'inline-flex items-center gap-1.5 px-3 py-1 rounded-lg text-2xs font-semibold transition-all',
+                      isSubActive
+                        ? 'bg-blue-600 text-white shadow-2xs font-bold cursor-default'
+                        : isSubCompleted
+                        ? 'bg-emerald-50 text-emerald-800 border border-emerald-200 hover:bg-emerald-100 cursor-pointer'
+                        : 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed opacity-70'
+                    )}
+                  >
+                    {isSubCompleted ? (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+                    ) : (
+                      <span
+                        className={cn(
+                          'w-3.5 h-3.5 rounded-full flex items-center justify-center text-3xs',
+                          isSubActive ? 'bg-blue-700 text-white' : 'bg-slate-200 text-slate-600'
+                        )}
+                      >
+                        {sIdx + 1}
+                      </span>
+                    )}
+                    <span>{sub.label}</span>
+                  </button>
+
+                  {sIdx < activeStageObj.subSteps.length - 1 && (
+                    <ChevronRight className="w-3 h-3 text-slate-300 shrink-0" />
+                  )}
+                </React.Fragment>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 });
+
+SchedulingStepper.displayName = 'SchedulingStepper';

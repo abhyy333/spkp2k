@@ -9,7 +9,6 @@ import {
   EyeOff,
   Database,
   Loader2,
-  ArrowLeft,
   Info,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,12 +20,12 @@ import { AppLoader } from '../../components/ui/AppLoader';
 
 export const AuthPage: React.FC = () => {
   const navigate = useNavigate();
-  const { signIn, authStatus, effectiveAccessMode } = useAuth();
+  const { signIn, authStatus, role } = useAuth();
 
   // Form states
-  const [loginEmail, setLoginEmail] = useState('');
-  const [loginPassword, setLoginPassword] = useState('');
-  const [showLoginPassword, setShowLoginPassword] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
 
   // Modal & Info states
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -34,17 +33,16 @@ export const AuthPage: React.FC = () => {
   const [showConfigModal, setShowConfigModal] = useState(false);
   const [showForgotPasswordModal, setShowForgotPasswordModal] = useState(false);
 
-  // 1. MUST WAIT FOR AUTH STATUS INITIALIZATION
+  // 1. Wait for auth status
   if (authStatus === 'INITIALIZING') {
     return <AppLoader />;
   }
 
-  // 2. If already authenticated and NOT previewing as Guest, redirect to Dashboard
-  if (authStatus === 'AUTHENTICATED' && effectiveAccessMode !== 'GUEST') {
+  // 2. If authenticated, route to appropriate dashboard based on database role
+  if (authStatus === 'AUTHENTICATED') {
     return <Navigate to="/dashboard" replace />;
   }
 
-  // Sign In Handler
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg(null);
@@ -57,14 +55,14 @@ export const AuthPage: React.FC = () => {
       return;
     }
 
-    if (!loginEmail.trim() || !loginPassword) {
+    if (!email.trim() || !password) {
       setErrorMsg('Silakan masukkan email dan kata sandi.');
       return;
     }
 
     setSubmitting(true);
     try {
-      const res = await signIn(loginEmail.trim().toLowerCase(), loginPassword);
+      const res = await signIn(email.trim().toLowerCase(), password);
       if (res.error) {
         setErrorMsg(res.error);
         setSubmitting(false);
@@ -73,45 +71,43 @@ export const AuthPage: React.FC = () => {
 
       if (res.role === 'ADMIN' || res.isOwner) {
         toast.success('Berhasil masuk sebagai Administrator.');
-        navigate('/dashboard', { replace: true });
       } else {
         toast.success('Berhasil masuk sebagai Dosen.');
-        navigate('/dashboard', { replace: true });
       }
+      navigate('/dashboard', { replace: true });
     } catch (err: any) {
-      setErrorMsg(err.message || 'Terjadi kesalahan sistem saat proses masuk.');
+      setErrorMsg(err.message || 'Terjadi kesalahan saat proses masuk.');
     } finally {
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8">
-      {/* Background subtle decoration */}
+    <div className="min-h-screen bg-slate-50 flex flex-col justify-center items-center p-4 sm:p-6 lg:p-8">
+      {/* Background subtle ambiance */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none -z-10">
-        <div className="absolute -top-40 -right-40 w-96 h-96 bg-blue-100/50 rounded-full blur-3xl" />
-        <div className="absolute -bottom-40 -left-40 w-96 h-96 bg-amber-100/40 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] bg-blue-100/40 rounded-full blur-3xl" />
       </div>
 
       <div className="w-full max-w-md">
         {/* Main Auth Card */}
-        <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xl p-6 sm:p-8">
+        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
           {/* Logo and Header */}
           <div className="flex flex-col items-center text-center mb-6">
-            <div className="mb-3 drop-shadow-sm">
+            <div className="mb-3">
               <UnramLogo size={56} />
             </div>
             <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-snug">
-              SPK Penjadwalan Perkuliahan
+              SPK Penjadwalan JTE UNRAM
             </h1>
-            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1 leading-relaxed">
+            <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
               Jurusan Teknik Elektro — Universitas Mataram
             </p>
           </div>
 
           {/* Error Banner */}
           {errorMsg && (
-            <div className="mb-5 p-3.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
+            <div className="mb-5 p-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-800 text-xs flex items-start gap-2.5">
               <AlertCircle className="w-4 h-4 text-rose-600 shrink-0 mt-0.5" />
               <div className="flex-1 leading-relaxed">{errorMsg}</div>
             </div>
@@ -139,7 +135,7 @@ export const AuthPage: React.FC = () => {
             </div>
           )}
 
-          {/* FORM MASUK (LOGIN) */}
+          {/* SINGLE LOGIN FORM FOR ALL ROLES */}
           <form onSubmit={handleLoginSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1.5">
@@ -152,10 +148,11 @@ export const AuthPage: React.FC = () => {
                 <input
                   type="email"
                   required
+                  autoComplete="email"
                   placeholder="nama@unram.ac.id"
-                  value={loginEmail}
-                  onChange={(e) => setLoginEmail(e.target.value)}
-                  className="w-full pl-10 pr-3.5 py-2.5 text-sm bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-slate-800 transition-colors"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="w-full pl-10 pr-3.5 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900 transition-colors"
                 />
               </div>
             </div>
@@ -178,19 +175,21 @@ export const AuthPage: React.FC = () => {
                   <Lock className="w-4 h-4" />
                 </div>
                 <input
-                  type={showLoginPassword ? 'text' : 'password'}
+                  type={showPassword ? 'text' : 'password'}
                   required
+                  autoComplete="current-password"
                   placeholder="••••••••"
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  className="w-full pl-10 pr-10 py-2.5 text-sm bg-slate-50/50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/30 focus:border-blue-500 text-slate-800 transition-colors"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full pl-10 pr-10 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 text-slate-900 transition-colors"
                 />
                 <button
                   type="button"
-                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  onClick={() => setShowPassword(!showPassword)}
                   className="absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 cursor-pointer"
+                  tabIndex={-1}
                 >
-                  {showLoginPassword ? (
+                  {showPassword ? (
                     <EyeOff className="w-4 h-4" />
                   ) : (
                     <Eye className="w-4 h-4" />
@@ -203,7 +202,7 @@ export const AuthPage: React.FC = () => {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500/40 shadow-xs transition-all disabled:opacity-60 cursor-pointer"
+                className="w-full inline-flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 transition-all disabled:opacity-60 cursor-pointer"
               >
                 {submitting ? (
                   <>
@@ -220,37 +219,25 @@ export const AuthPage: React.FC = () => {
             </div>
           </form>
 
-          {/* Admin Managed Account Notice */}
-          <div className="mt-5 p-3 rounded-xl bg-slate-50 border border-slate-200/80 text-slate-600 text-xs flex items-start gap-2.5">
+          {/* Info note */}
+          <div className="mt-5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-start gap-2.5">
             <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
             <p className="leading-relaxed text-2xs">
-              Seluruh akun Administrator dan Dosen dikelola secara terpusat oleh Pengelola Jurusan.
+              Sistem internal untuk Admin dan Dosen Jurusan Teknik Elektro. Akun dikelola langsung oleh Pengelola Jurusan.
             </p>
-          </div>
-
-          {/* Footer CTA link to public schedule */}
-          <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col items-center">
-            <button
-              type="button"
-              onClick={() => navigate('/jadwal-perkuliahan')}
-              className="inline-flex items-center gap-2 text-xs font-semibold text-slate-600 hover:text-blue-600 transition-colors cursor-pointer py-1.5 px-3 rounded-lg hover:bg-slate-50"
-            >
-              <ArrowLeft className="w-3.5 h-3.5" />
-              Lihat Jadwal Tanpa Akun
-            </button>
           </div>
         </div>
 
         {/* Bottom copyright */}
         <p className="text-center text-2xs text-slate-400 mt-6">
-          &copy; {new Date().getFullYear()} Jurusan Teknik Elektro Fakultas Teknik Universitas Mataram
+          &copy; {new Date().getFullYear()} Jurusan Teknik Elektro — Universitas Mataram
         </p>
       </div>
 
       {/* Forgot Password Information Dialog */}
       {showForgotPasswordModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150">
             <div className="flex flex-col items-center text-center">
               <div className="w-12 h-12 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center mb-3">
                 <Info className="w-6 h-6" />
@@ -259,14 +246,14 @@ export const AuthPage: React.FC = () => {
                 Lupa Kata Sandi
               </h3>
               <p className="text-xs text-slate-600 leading-relaxed mb-6">
-                Silakan hubungi Administrator Jurusan Teknik Elektro untuk melakukan reset kata sandi akun Anda.
+                Silakan hubungi Admin Jurusan Teknik Elektro untuk melakukan reset kata sandi akun Anda.
               </p>
               <button
                 type="button"
                 onClick={() => setShowForgotPasswordModal(false)}
-                className="w-full py-2.5 px-4 rounded-xl text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer"
+                className="w-full py-2 px-4 rounded-xl text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 transition-colors cursor-pointer"
               >
-                Mengerti
+                Tutup
               </button>
             </div>
           </div>
@@ -280,4 +267,3 @@ export const AuthPage: React.FC = () => {
     </div>
   );
 };
-

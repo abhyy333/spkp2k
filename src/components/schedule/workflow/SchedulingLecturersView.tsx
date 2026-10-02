@@ -987,7 +987,7 @@ export const SchedulingLecturersView: React.FC<SchedulingLecturersViewProps> = (
                   : 'Lanjut ke tahap penjadwalan awal'
               }
             >
-              <span>Lanjut ke Generate Jadwal Awal</span>
+              <span>Lanjut ke Penyusunan Jadwal Awal (Tahap 2)</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>

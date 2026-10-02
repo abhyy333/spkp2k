@@ -24,11 +24,21 @@ export const authorizedAccountsService = {
     }
 
     try {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from('authorized_accounts')
         .select('email, role, is_active, must_change_password')
         .eq('email', cleanEmail)
         .maybeSingle();
+
+      if (error && (error.code === '42703' || error.message?.includes('must_change_password'))) {
+        const fallbackRes = await supabase
+          .from('authorized_accounts')
+          .select('email, role, is_active')
+          .eq('email', cleanEmail)
+          .maybeSingle();
+        data = fallbackRes.data ? { ...fallbackRes.data, must_change_password: false } : null;
+        error = fallbackRes.error;
+      }
 
       if (error || !data || !data.is_active) {
         return {
@@ -61,37 +71,74 @@ export const authorizedAccountsService = {
     }
 
     try {
-      let query = supabase
-        .from('authorized_accounts')
-        .select(`
-          email,
-          role,
-          lecturer_id,
-          user_id,
-          is_active,
-          is_system_owner,
-          must_change_password,
-          created_by,
-          created_at,
-          updated_at,
-          claimed_at
-        `)
-        .order('created_at', { ascending: true });
+      const fetchAuthorized = async () => {
+        let query = supabase
+          .from('authorized_accounts')
+          .select(`
+            email,
+            role,
+            lecturer_id,
+            user_id,
+            is_active,
+            is_system_owner,
+            must_change_password,
+            created_by,
+            created_at,
+            updated_at,
+            claimed_at
+          `)
+          .order('created_at', { ascending: true });
 
-      if (roleFilter) {
-        query = query.eq('role', roleFilter);
-      }
+        if (roleFilter) {
+          query = query.eq('role', roleFilter);
+        }
 
-      const [{ data, error }, { data: lecturersData }] = await Promise.all([
-        query,
+        const { data, error } = await query;
+        if (error && (error.code === '42703' || error.message?.includes('must_change_password'))) {
+          // Fallback without must_change_password
+          let fallbackQuery = supabase
+            .from('authorized_accounts')
+            .select(`
+              email,
+              role,
+              lecturer_id,
+              user_id,
+              is_active,
+              is_system_owner,
+              created_by,
+              created_at,
+              updated_at,
+              claimed_at
+            `)
+            .order('created_at', { ascending: true });
+
+          if (roleFilter) {
+            fallbackQuery = fallbackQuery.eq('role', roleFilter);
+          }
+
+          const fallbackRes = await fallbackQuery;
+          if (fallbackRes.error) {
+            throw fallbackRes.error;
+          }
+          return (fallbackRes.data || []).map(row => ({ ...row, must_change_password: false }));
+        }
+
+        if (error) {
+          throw error;
+        }
+
+        return data || [];
+      };
+
+      const [data, { data: lecturersData, error: lecturersError }] = await Promise.all([
+        fetchAuthorized(),
         supabase
           .from('lecturers')
-          .select('id, name, lecturer_code, code, nip, email, status, kbk_id'),
+          .select('id, name, lecturer_code, nip, email, status, kbk_id'),
       ]);
 
-      if (error) {
-        console.error('Error fetching authorized_accounts:', error);
-        throw new Error(parseSupabaseError(error));
+      if (lecturersError) {
+        console.error('Error fetching lecturers for authorized accounts:', lecturersError);
       }
 
       const lecturersMap = new Map<string, Lecturer>();
@@ -173,32 +220,44 @@ export const authorizedAccountsService = {
       throw new Error('Dosen pengampu wajib dipilih.');
     }
 
-    const { data, error } = await supabase.rpc('admin_create_account', {
-      p_email: cleanEmail,
-      p_role: payload.role,
-      p_lecturer_id: payload.lecturerId || null,
-      p_full_name: payload.fullName || null,
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-create-account', {
+        body: {
+          email: cleanEmail,
+          full_name: payload.fullName || (payload.role === 'ADMIN' ? 'Administrator' : 'Dosen'),
+          role: payload.role,
+          lecturer_id: payload.lecturerId || null,
+        }
+      });
 
-    if (error) {
-      let msg = error.message || '';
-      if (msg.includes('EMAIL_ALREADY_EXISTS')) {
-        msg = `Email ${cleanEmail} sudah terdaftar dengan akun aktif.`;
-      } else if (msg.includes('LECTURER_ALREADY_LINKED')) {
-        msg = 'Dosen tersebut sudah memiliki akun terdaftar.';
-      } else if (msg.includes('LECTURER_REQUIRED')) {
-        msg = 'Dosen pengampu wajib dipilih untuk akun Dosen.';
-      } else {
-        msg = parseSupabaseError(error);
+      if (error || (data && data.error)) {
+        const errObj = error || data;
+        let msg = errObj.message || '';
+        const code = errObj.error || errObj.code;
+
+        if (code === 'EMAIL_ALREADY_EXISTS' || msg.includes('EMAIL_ALREADY_EXISTS')) {
+          msg = 'Email sudah terdaftar.';
+        } else if (code === 'LECTURER_ALREADY_LINKED' || msg.includes('LECTURER_ALREADY_LINKED')) {
+          msg = 'Dosen tersebut sudah memiliki akun.';
+        } else if (code === 'UNAUTHORIZED' || msg.includes('UNAUTHORIZED')) {
+          msg = 'Anda tidak memiliki izin untuk melakukan tindakan ini.';
+        } else if (code === 'LECTURER_REQUIRED' || msg.includes('LECTURER_REQUIRED')) {
+          msg = 'Dosen pengampu wajib dipilih.';
+        } else {
+          msg = msg || 'Akun gagal dibuat. Silakan coba lagi.';
+        }
+        throw new Error(msg);
       }
-      throw new Error(msg);
-    }
 
-    return {
-      email: data.email || cleanEmail,
-      temporaryPassword: data.temporary_password,
-      userId: data.user_id,
-    };
+      return {
+        email: data.email || cleanEmail,
+        temporaryPassword: data.temporary_password || '',
+        userId: data.user_id || '',
+      };
+    } catch (err: any) {
+      console.error('Failed to create account:', err);
+      throw err;
+    }
   },
 
   /**
@@ -218,24 +277,36 @@ export const authorizedAccountsService = {
       throw new Error('Alamat email wajib diisi.');
     }
 
-    const { data, error } = await supabase.rpc('admin_reset_password', {
-      p_target_email: cleanEmail,
-    });
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-reset-password', {
+        body: {
+          email: cleanEmail,
+        }
+      });
 
-    if (error) {
-      let msg = error.message || '';
-      if (msg.includes('USER_NOT_FOUND')) {
-        msg = `Akun untuk ${cleanEmail} belum dibuat di sistem.`;
-      } else {
-        msg = parseSupabaseError(error);
+      if (error || (data && data.error)) {
+        const errObj = error || data;
+        let msg = errObj.message || '';
+        const code = errObj.error || errObj.code;
+
+        if (code === 'USER_NOT_FOUND' || msg.includes('USER_NOT_FOUND')) {
+          msg = `Akun untuk ${cleanEmail} tidak ditemukan di sistem.`;
+        } else if (code === 'UNAUTHORIZED' || msg.includes('UNAUTHORIZED')) {
+          msg = 'Anda tidak memiliki izin untuk melakukan tindakan ini.';
+        } else {
+          msg = msg || 'Gagal mereset kata sandi. Silakan coba lagi.';
+        }
+        throw new Error(msg);
       }
-      throw new Error(msg);
-    }
 
-    return {
-      email: data.email || cleanEmail,
-      temporaryPassword: data.temporary_password,
-    };
+      return {
+        email: data.email || cleanEmail,
+        temporaryPassword: data.temporary_password || '',
+      };
+    } catch (err: any) {
+      console.error('Failed to reset password:', err);
+      throw err;
+    }
   },
 
   /**

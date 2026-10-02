@@ -56,6 +56,14 @@ export function dayOfWeekToName(day: number): string {
 }
 
 /**
+ * Mendapatkan nama hari bahasa Indonesia dari objek Date
+ */
+export function getDayNameIndo(date: Date): string {
+  const days = ['Minggu', 'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu'];
+  return days[date.getDay()];
+}
+
+/**
  * Konversi Nama Hari ke integer day_of_week
  */
 export function nameToDayOfWeek(name: string): number {
@@ -192,6 +200,9 @@ export function parseSupabaseError(error: any, context?: string): string {
   }
   if (msg.includes('HARD_CONFLICTS_EXIST')) {
     return 'Masih terdapat bentrok jadwal yang belum diselesaikan.';
+  }
+  if (msg.includes('PUBLISHED_LECTURE_SCHEDULE_REQUIRED')) {
+    return 'Jadwal perkuliahan resmi belum diterbitkan untuk periode semester ini. Tetapkan terlebih dahulu Jadwal Perkuliahan sebagai Final di menu Penyusunan Jadwal sebelum menyusun jadwal ujian.';
   }
   if (msg.includes('STALE_REVISION') || msg.includes('stale revision') || msg.includes('revision mismatch')) {
     return 'Versi draft telah berubah. Muat ulang data terbaru sebelum menerbitkan.';

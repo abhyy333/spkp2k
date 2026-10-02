@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { ScheduleVersion } from '../../../types';
+import { ScheduleVersion, CurrentPublishedSchedule, AcademicTerm } from '../../../types';
 import { Drawer } from '../../ui/Drawer';
 import {
   History,
@@ -11,9 +11,16 @@ import {
   Edit3,
   Eraser,
   Check,
+  Eye,
+  FileText,
+  FileSpreadsheet,
+  Loader2,
 } from 'lucide-react';
 import { formatDateTimeIndo } from '../../../lib/utils';
 import { scheduleVersionsService } from '../../../services/scheduleVersions.service';
+import { scheduleEntriesService } from '../../../services/scheduleEntries.service';
+import { generateLectureSchedulePDF } from '../../../lib/pdf/pdfGenerator';
+import { generateLectureScheduleExcel } from '../../../lib/excel/excelGenerator';
 import { toast } from '../../ui/Toast';
 import {
   ScheduleActionConfirmDialog,
@@ -62,8 +69,96 @@ export const VersionHistoryDrawer: React.FC<VersionHistoryDrawerProps> = ({
   const [actionProcessing, setActionProcessing] = useState<boolean>(false);
 
   const [restoringVersionId, setRestoringVersionId] = useState<string | null>(null);
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [showEmptyDrafts, setShowEmptyDrafts] = useState<boolean>(false);
   const [cleaningEmpty, setCleaningEmpty] = useState<boolean>(false);
+
+  const fetchVersionSchedules = async (ver: ScheduleVersion): Promise<CurrentPublishedSchedule[]> => {
+    const rawEntries = await scheduleEntriesService.getEntriesByVersionId(ver.id);
+    return rawEntries.map((e) => {
+      const off = e.course_offering;
+      return {
+        id: e.id,
+        term_id: termId,
+        course_id: off?.course?.id || '',
+        day: e.day || '',
+        room_id: e.room_id || e.room?.id || '',
+        schedule_version_id: ver.id,
+        course_offering_id: e.course_offering_id || '',
+        day_name: e.day || '',
+        day_of_week: Number(e.day_of_week) || 1,
+        start_minute: e.start_minute || 470,
+        end_minute: e.end_minute || 620,
+        start_time: e.start_time || '',
+        end_time: e.end_time || '',
+        course_name: e.course_name || off?.course?.name || '',
+        course_code: e.course_code || off?.course?.code || '',
+        class_name: e.class_code || off?.class_code || 'A',
+        sks: off?.course?.effective_sks || 3,
+        semester: off?.course?.semester || 1,
+        room_name: e.room?.name || '',
+        room_code: e.room?.code || '',
+        lecturer_names: Array.isArray(e.lecturer_names)
+          ? e.lecturer_names.join(', ')
+          : (e.lecturer_names || '-'),
+        student_count: e.student_count || off?.expected_students || 0,
+      };
+    });
+  };
+
+  const handleDownloadPdf = async (ver: ScheduleVersion) => {
+    setDownloadingId(ver.id);
+    try {
+      const list = await fetchVersionSchedules(ver);
+      if (list.length === 0) {
+        toast.info('Versi ini belum memiliki entri kelas untuk diunduh.');
+        return;
+      }
+      const dummyTerm: AcademicTerm = {
+        id: termId,
+        year: '2026/2027',
+        academic_year: '2026/2027',
+        term: 'GANJIL',
+        semester_type: 'GANJIL',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      await generateLectureSchedulePDF(list, dummyTerm);
+      toast.success(`PDF Jadwal "${ver.title || 'Versi ' + ver.version_number}" berhasil diunduh.`);
+    } catch (err: any) {
+      console.error('Download PDF error:', err);
+      toast.error('Gagal membuat file PDF.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
+
+  const handleDownloadExcel = async (ver: ScheduleVersion) => {
+    setDownloadingId(ver.id);
+    try {
+      const list = await fetchVersionSchedules(ver);
+      if (list.length === 0) {
+        toast.info('Versi ini belum memiliki entri kelas untuk diunduh.');
+        return;
+      }
+      const dummyTerm: AcademicTerm = {
+        id: termId,
+        year: '2026/2027',
+        academic_year: '2026/2027',
+        term: 'GANJIL',
+        semester_type: 'GANJIL',
+        is_active: true,
+        created_at: new Date().toISOString(),
+      };
+      generateLectureScheduleExcel(list, dummyTerm);
+      toast.success(`Excel Jadwal "${ver.title || 'Versi ' + ver.version_number}" berhasil diunduh.`);
+    } catch (err: any) {
+      console.error('Download Excel error:', err);
+      toast.error('Gagal membuat file Excel.');
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   const isVersionEmptyDraft = (v: ScheduleVersion) => {
     if (v.status !== 'DRAFT') return false;
@@ -379,71 +474,74 @@ export const VersionHistoryDrawer: React.FC<VersionHistoryDrawerProps> = ({
                     )}
 
                     <div className="flex items-center justify-end gap-1.5 pt-2 border-t border-slate-100 flex-wrap">
-                      {/* Restore as new draft button for Published/Replaced versions */}
-                      {(isPublished || isReplaced) && (
-                        <button
-                          type="button"
-                          disabled={isRestoring}
-                          onClick={() => handleRestore(ver)}
-                          className="inline-flex items-center gap-1.5 px-3 py-1 text-2xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-2xs cursor-pointer disabled:opacity-50"
-                        >
-                          <RotateCcw className="w-3 h-3" />
-                          <span>{isRestoring ? 'Memulihkan...' : `Pulihkan Versi ${ver.version_number}`}</span>
-                        </button>
-                      )}
-
-                      {/* Open draft button for non-empty active drafts */}
-                      {ver.status === 'DRAFT' && !isSelected && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            onSelectVersion(ver.id);
-                            onClose();
-                          }}
-                          className="inline-flex items-center gap-1 px-3 py-1 text-2xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-2xs cursor-pointer"
-                        >
-                          <span>Buka Draf</span>
-                        </button>
-                      )}
-
-                      {/* Kosongkan Draft on Draft */}
-                      {ver.status === 'DRAFT' && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenClear(e, ver)}
-                          className="inline-flex items-center gap-1 px-2.5 py-1 text-2xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-lg transition-colors cursor-pointer"
-                          title="Kosongkan alokasi draf ini"
-                        >
-                          <Eraser className="w-3 h-3" />
-                          <span>Kosongkan Draft</span>
-                        </button>
-                      )}
-
-                      {/* Salin / Cabang */}
+                      {/* 1. Lihat */}
                       <button
                         type="button"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenCopy(ver);
+                        onClick={() => {
+                          onSelectVersion(ver.id);
+                          onClose();
                         }}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 text-2xs font-semibold text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 rounded-lg transition-colors cursor-pointer"
-                        title="Buat alternatif cabang dari jadwal ini"
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-2xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors cursor-pointer"
+                        title="Lihat jadwal versi ini"
                       >
-                        <Copy className="w-3 h-3 text-slate-500" />
-                        <span>Cabang</span>
+                        <Eye className="w-3 h-3 text-slate-500" />
+                        <span>Lihat</span>
                       </button>
 
-                      {/* Delete draft */}
-                      {ver.status === 'DRAFT' && (
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenDelete(e, ver)}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition-colors cursor-pointer"
-                          title="Hapus Draf"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      )}
+                      {/* 2. Pulihkan (Copy snapshot ke workspace aktif) */}
+                      <button
+                        type="button"
+                        disabled={isRestoring}
+                        onClick={() => handleRestore(ver)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-2xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-all shadow-2xs cursor-pointer disabled:opacity-50"
+                        title="Pulihkan dan salin snapshot ke workspace aktif"
+                      >
+                        <RotateCcw className="w-3 h-3" />
+                        <span>{isRestoring ? 'Memulihkan...' : 'Pulihkan'}</span>
+                      </button>
+
+                      {/* 3. Download PDF */}
+                      <button
+                        type="button"
+                        disabled={downloadingId === ver.id}
+                        onClick={() => handleDownloadPdf(ver)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-2xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                        title="Unduh jadwal format PDF"
+                      >
+                        {downloadingId === ver.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-rose-600" />
+                        ) : (
+                          <FileText className="w-3 h-3 text-rose-600" />
+                        )}
+                        <span>Download PDF</span>
+                      </button>
+
+                      {/* 4. Download Excel */}
+                      <button
+                        type="button"
+                        disabled={downloadingId === ver.id}
+                        onClick={() => handleDownloadExcel(ver)}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 text-2xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 rounded-lg transition-colors cursor-pointer disabled:opacity-50"
+                        title="Unduh jadwal format Excel (.xlsx)"
+                      >
+                        {downloadingId === ver.id ? (
+                          <Loader2 className="w-3 h-3 animate-spin text-emerald-600" />
+                        ) : (
+                          <FileSpreadsheet className="w-3 h-3 text-emerald-600" />
+                        )}
+                        <span>Download Excel</span>
+                      </button>
+
+                      {/* 5. Hapus */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleOpenDelete(e, ver)}
+                        className="inline-flex items-center gap-1 px-2 py-1 text-2xs font-semibold text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                        title="Hapus versi ini"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Hapus</span>
+                      </button>
                     </div>
                   </div>
                 );

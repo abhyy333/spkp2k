@@ -347,7 +347,7 @@ export const LecturerProfilePage: React.FC = () => {
 
   const displayName = lecturer.name || profile?.name || 'Dosen Elektro';
   const nipDisplay = lecturer.nip || '-';
-  const codeDisplay = lecturer.lecturer_code || lecturer.code || '-';
+  const codeDisplay = lecturer.lecturer_code || '-';
   const kbkName = lecturer.kbk?.name || 'Teknik Elektro';
   const avatarUrl = (lecturer as any).avatar_url || profile?.avatar_url || null;
 

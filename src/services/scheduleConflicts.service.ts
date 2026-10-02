@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../lib/supabase';
 import { ScheduleConflict } from '../types';
+import { fetchWithCache } from '../lib/queryCache';
 
 export const scheduleConflictsService = {
   /**
@@ -17,47 +18,55 @@ export const scheduleConflictsService = {
       return [];
     }
 
-    try {
-      let query = supabase
-        .from('schedule_conflicts')
-        .select('*')
-        .order('created_at', { ascending: false });
+    const cacheKey = `conflicts_${versionId || 'all'}_${JSON.stringify(filters || {})}`;
 
-      if (versionId && versionId !== 'all') {
-        query = query.eq('schedule_version_id', versionId);
-      }
+    return fetchWithCache(
+      cacheKey,
+      async () => {
+        try {
+          let query = supabase
+            .from('schedule_conflicts')
+            .select('*')
+            .order('created_at', { ascending: false });
 
-      if (filters?.severity && filters.severity !== 'all') {
-        query = query.ilike('severity', `%${filters.severity}%`);
-      }
+          if (versionId && versionId !== 'all') {
+            query = query.eq('schedule_version_id', versionId);
+          }
 
-      if (filters?.type && filters.type !== 'all') {
-        query = query.eq('conflict_type', filters.type);
-      }
+          if (filters?.severity && filters.severity !== 'all') {
+            query = query.ilike('severity', `%${filters.severity}%`);
+          }
 
-      if (typeof filters?.isResolved === 'boolean') {
-        query = query.eq('is_resolved', filters.isResolved);
-      }
+          if (filters?.type && filters.type !== 'all') {
+            query = query.eq('conflict_type', filters.type);
+          }
 
-      const { data, error } = await query;
-      if (error) {
-        console.warn('Conflicts query warning:', error);
-        return [];
-      }
+          if (typeof filters?.isResolved === 'boolean') {
+            query = query.eq('is_resolved', filters.isResolved);
+          }
 
-      // STRICT RULE: JANGAN tampilkan STUDENT conflict!
-      const valid = (data || []).filter(
-        (c: ScheduleConflict) =>
-          c.conflict_type !== 'STUDENT' &&
-          c.conflict_type !== 'CLASS' &&
-          !c.conflict_type?.includes('STUDENT')
-      );
+          const { data, error } = await query;
+          if (error) {
+            console.warn('Conflicts query warning:', error);
+            return [];
+          }
 
-      return valid;
-    } catch (err) {
-      console.error('Error fetching conflicts:', err);
-      return [];
-    }
+          // STRICT RULE: JANGAN tampilkan STUDENT conflict!
+          const valid = (data || []).filter(
+            (c: ScheduleConflict) =>
+              c.conflict_type !== 'STUDENT' &&
+              c.conflict_type !== 'CLASS' &&
+              !c.conflict_type?.includes('STUDENT')
+          );
+
+          return valid;
+        } catch (err) {
+          console.error('Error fetching conflicts:', err);
+          return [];
+        }
+      },
+      { staleTimeMs: 2 * 60 * 1000 }
+    );
   },
 
   /**

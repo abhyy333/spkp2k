@@ -95,4 +95,73 @@ export const scheduleEntriesService = {
       return [];
     }
   },
+
+  /**
+   * Update single schedule entry in database
+   */
+  async updateEntry(
+    entryId: string,
+    updates: {
+      room_id?: string;
+      day_of_week?: number;
+      start_minute?: number;
+      end_minute?: number;
+    }
+  ): Promise<boolean> {
+    if (!isSupabaseConfigured() || !entryId) return false;
+    try {
+      const payload: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      if (updates.room_id !== undefined) payload.room_id = updates.room_id;
+      if (updates.day_of_week !== undefined) payload.day_of_week = updates.day_of_week;
+      if (updates.start_minute !== undefined) payload.start_minute = updates.start_minute;
+      if (updates.end_minute !== undefined) payload.end_minute = updates.end_minute;
+
+      const { error } = await supabase
+        .from('schedule_entries')
+        .update(payload)
+        .eq('id', entryId);
+
+      if (error) {
+        console.error('Error updating schedule entry:', error);
+        return false;
+      }
+      return true;
+    } catch (err) {
+      console.error('Exception updating schedule entry:', err);
+      return false;
+    }
+  },
+
+  /**
+   * Batch update schedule entries
+   */
+  async batchUpdateEntries(
+    entries: Array<{
+      id: string;
+      room_id?: string;
+      day_of_week?: number;
+      start_minute?: number;
+      end_minute?: number;
+    }>
+  ): Promise<boolean> {
+    if (!isSupabaseConfigured() || entries.length === 0) return false;
+    try {
+      await Promise.all(
+        entries.map((e) =>
+          this.updateEntry(e.id, {
+            room_id: e.room_id,
+            day_of_week: e.day_of_week,
+            start_minute: e.start_minute,
+            end_minute: e.end_minute,
+          })
+        )
+      );
+      return true;
+    } catch (err) {
+      console.error('Exception batch updating entries:', err);
+      return false;
+    }
+  },
 };

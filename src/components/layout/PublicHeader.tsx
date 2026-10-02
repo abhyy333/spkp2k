@@ -1,11 +1,15 @@
 import React from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { Calendar, CalendarCheck, UserCheck, LogIn, ArrowRight } from 'lucide-react';
+import { Calendar, CalendarCheck, UserCheck, LogIn, ArrowRight, Search, Sparkles } from 'lucide-react';
 import { UnramLogo } from '../shared/UnramLogo';
 import { useAuth } from '../../contexts/AuthContext';
 import { cn } from '../../lib/utils';
 
-export const PublicHeader: React.FC = () => {
+interface PublicHeaderProps {
+  onOpenCommandPalette?: () => void;
+}
+
+export const PublicHeader: React.FC<PublicHeaderProps> = ({ onOpenCommandPalette }) => {
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
@@ -113,6 +117,18 @@ export const PublicHeader: React.FC = () => {
 
         {/* Right Action (Desktop) */}
         <div className="hidden sm:flex items-center gap-2 shrink-0">
+          {onOpenCommandPalette && (
+            <button
+              onClick={onOpenCommandPalette}
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-semibold text-slate-600 bg-slate-100/80 hover:bg-slate-200/80 border border-slate-200/80 transition-colors cursor-pointer"
+            >
+              <Search className="w-3.5 h-3.5 text-slate-500" />
+              <span>Cari...</span>
+              <kbd className="px-1.5 py-0.5 text-[10px] font-mono text-slate-500 bg-white rounded border border-slate-200">
+                Ctrl+K
+              </kbd>
+            </button>
+          )}
           {user ? (
             <button
               onClick={() => navigate('/dashboard')}

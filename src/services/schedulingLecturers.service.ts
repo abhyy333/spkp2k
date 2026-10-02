@@ -217,7 +217,6 @@ export const schedulingLecturersService = {
           id: l.id,
           name: l.name,
           lecturer_code: l.lecturer_code || '',
-          code: l.lecturer_code || '',
           nip: l.nip || null,
           kbk_id: l.kbk_id || null,
           expertise: l.expertise || null,

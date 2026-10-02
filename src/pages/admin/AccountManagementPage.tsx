@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Users,
   ShieldCheck,
@@ -15,6 +15,9 @@ import {
   RefreshCw,
   Info,
   AlertTriangle,
+  Copy,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { StatCard } from '../../components/ui/StatCard';
@@ -32,7 +35,10 @@ export const AccountManagementPage: React.FC = () => {
   const [accounts, setAccounts] = useState<AuthorizedAccount[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
+  const isLoadingRef = useRef(false);
+  const lastErrorToastRef = useRef<number>(0);
 
   // Modal Add Admin
   const [adminModalOpen, setAdminModalOpen] = useState(false);
@@ -63,9 +69,12 @@ export const AccountManagementPage: React.FC = () => {
   });
   const [actionLoading, setActionLoading] = useState(false);
 
-  // Load Data
+  // Load Data with in-flight guard and centralized error handling
   const loadData = async () => {
+    if (isLoadingRef.current) return;
+    isLoadingRef.current = true;
     setLoading(true);
+    setLoadError(null);
     try {
       const [accs, lects] = await Promise.all([
         authorizedAccountsService.getAuthorizedAccounts(),
@@ -74,9 +83,16 @@ export const AccountManagementPage: React.FC = () => {
       setAccounts(accs);
       setLecturers(lects);
     } catch (err: any) {
-      toast.error(err.message || 'Gagal memuat data akun otorisasi.');
+      const msg = 'Data akun gagal dimuat. Silakan coba lagi.';
+      setLoadError(msg);
+      const now = Date.now();
+      if (now - lastErrorToastRef.current > 2000) {
+        lastErrorToastRef.current = now;
+        toast.error(msg);
+      }
     } finally {
       setLoading(false);
+      isLoadingRef.current = false;
     }
   };
 
@@ -95,7 +111,6 @@ export const AccountManagementPage: React.FC = () => {
     const matchName = acc.lecturer?.name?.toLowerCase().includes(q) || false;
     const matchCode =
       acc.lecturer?.lecturer_code?.toLowerCase().includes(q) ||
-      acc.lecturer?.code?.toLowerCase().includes(q) ||
       false;
     return matchEmail || matchName || matchCode;
   });
@@ -363,8 +378,22 @@ export const AccountManagementPage: React.FC = () => {
         {/* Loading State */}
         {loading && <LoadingState rows={5} message="Memuat daftar otorisasi akun..." />}
 
+        {/* Error State */}
+        {!loading && loadError && (
+          <div className="p-8 bg-rose-50 border border-rose-200 rounded-2xl text-center space-y-3">
+            <AlertTriangle className="w-8 h-8 text-rose-600 mx-auto" />
+            <p className="text-xs font-semibold text-rose-900">{loadError}</p>
+            <button
+              onClick={loadData}
+              className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-semibold transition-colors shadow-2xs cursor-pointer"
+            >
+              Coba Lagi
+            </button>
+          </div>
+        )}
+
         {/* Empty State */}
-        {!loading && filteredAccounts.length === 0 && (
+        {!loading && !loadError && filteredAccounts.length === 0 && (
           <EmptyState
             icon={<Users className="w-8 h-8 text-slate-400" />}
             title={activeTab === 'ADMIN' ? 'Belum Ada Administrator' : 'Belum Ada Akun Dosen Terdaftar'}
@@ -514,7 +543,7 @@ export const AccountManagementPage: React.FC = () => {
                       <td className="py-3.5 px-3 text-center">
                         {acc.lecturer ? (
                           <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded border border-blue-100">
-                            {acc.lecturer.lecturer_code || acc.lecturer.code || '—'}
+                            {acc.lecturer.lecturer_code || '—'}
                           </span>
                         ) : (
                           <button

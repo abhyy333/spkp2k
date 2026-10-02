@@ -26,24 +26,11 @@ export const schedulingRombelService = {
     }
 
     try {
-      const isOwner = await verifyOwnerAdmin();
-      const coursesTable = isOwner ? 'courses' : 'guest_courses';
-      const offeringsTable = isOwner ? 'course_offerings' : 'guest_course_offerings';
-      const roomsTable = isOwner ? 'rooms' : 'guest_rooms';
-
       // 1. Fetch active rooms to extract eligible capacities by room_type
-      let { data: rawRooms, error: roomsError } = await supabase
-        .from(roomsTable)
+      const { data: rawRooms } = await supabase
+        .from('rooms')
         .select('id, name, code, capacity, room_type, is_active')
         .eq('is_active', true);
-
-      if (roomsError && !isOwner) {
-        const fbRooms = await supabase
-          .from('rooms')
-          .select('id, name, code, capacity, room_type, is_active')
-          .eq('is_active', true);
-        rawRooms = fbRooms.data;
-      }
 
       const activeRooms: Room[] = (rawRooms as Room[]) || [];
       const roomTypeCapacitiesMap = new Map<string, number[]>();
@@ -70,18 +57,10 @@ export const schedulingRombelService = {
         new Set(plannedCourses.map((pc) => pc.courseCode.trim().toUpperCase()))
       );
 
-      let { data: rawCourses, error: coursesError } = await supabase
-        .from(coursesTable)
+      const { data: rawCourses } = await supabase
+        .from('courses')
         .select('*')
         .in('code', courseCodes);
-
-      if (coursesError && !isOwner) {
-        const fb = await supabase
-          .from('courses')
-          .select('*')
-          .in('code', courseCodes);
-        rawCourses = fb.data;
-      }
 
       const coursesList: Course[] = (rawCourses as Course[]) || [];
       const courseIdMap = new Map<string, Course[]>(); // code -> Course[]
@@ -99,26 +78,14 @@ export const schedulingRombelService = {
       // 3. Fetch course_offerings for these courses and active term
       let offeringsList: any[] = [];
       if (allCourseIds.length > 0) {
-        let { data: rawOfferings, error: offError } = await supabase
-          .from(offeringsTable)
+        const { data: rawOfferings } = await supabase
+          .from('course_offerings')
           .select(
             'id, academic_term_id, course_id, class_code, effective_sks, expected_students, required_room_type, assignment_confirmed'
           )
           .eq('academic_term_id', termId)
           .in('course_id', allCourseIds)
           .order('class_code', { ascending: true });
-
-        if (offError && !isOwner) {
-          const fbOff = await supabase
-            .from('course_offerings')
-            .select(
-              'id, academic_term_id, course_id, class_code, effective_sks, expected_students, required_room_type, assignment_confirmed'
-            )
-            .eq('academic_term_id', termId)
-            .in('course_id', allCourseIds)
-            .order('class_code', { ascending: true });
-          rawOfferings = fbOff.data;
-        }
 
         offeringsList = rawOfferings || [];
       }

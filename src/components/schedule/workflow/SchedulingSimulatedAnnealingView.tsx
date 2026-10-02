@@ -977,12 +977,12 @@ export const SchedulingSimulatedAnnealingView: React.FC<SchedulingSimulatedAnnea
               </div>
               <div>
                 <p className="text-xs font-bold text-white">
-                  Tahap 5: {hasOptimized ? 'Solusi Teroptimasi' : 'Jadwal Awal Siap Dioptimasi'}
+                  Optimasi SA: {hasOptimized ? 'Solusi Teroptimasi' : 'Jadwal Awal Siap Dioptimasi'}
                 </p>
                 <p className="text-3xs text-slate-400">
                   {activeCost.hardConflictsCount === 0
-                    ? '0 Bentrok Keras (Solusi Feasible). Siap untuk ditinjau pada publikasi.'
-                    : `${activeCost.hardConflictsCount} bentrok terdeteksi. Jalankan optimasi untuk mengeliminasi.`}
+                    ? '0 Bentrok Keras (Solusi Feasible). Siap untuk ditinjau pada Hasil Jadwal.'
+                    : `${activeCost.hardConflictsCount} bentrok terdeteksi. Jalankan optimasi untuk mengeliminasi bentrok.`}
                 </p>
               </div>
             </div>
@@ -995,10 +995,10 @@ export const SchedulingSimulatedAnnealingView: React.FC<SchedulingSimulatedAnnea
                 className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold rounded-xl border border-slate-700 transition-colors cursor-pointer"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
-                <span>Kembali ke Step 4</span>
+                <span>Kembali ke Jadwal Awal</span>
               </button>
 
-              {/* Step 6: Preview & Publikasi */}
+              {/* Tahap 3: Hasil Jadwal */}
               <button
                 type="button"
                 onClick={() => {
@@ -1017,9 +1017,9 @@ export const SchedulingSimulatedAnnealingView: React.FC<SchedulingSimulatedAnnea
                     );
                   }
                 }}
-                className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-semibold rounded-xl shadow-xs shadow-blue-500/30 transition-all cursor-pointer"
+                className="inline-flex items-center gap-2 px-5 py-2.5 bg-blue-600 hover:bg-blue-700 active:scale-98 text-white text-xs font-bold rounded-xl shadow-sm shadow-blue-500/30 transition-all cursor-pointer"
               >
-                <span>Lanjut ke Preview & Publikasi (Step 6)</span>
+                <span>Lihat Hasil Jadwal (Tahap 3)</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </button>
             </div>

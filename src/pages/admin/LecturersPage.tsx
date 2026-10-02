@@ -169,7 +169,7 @@ export const LecturersPage: React.FC = () => {
     if (e) e.stopPropagation();
     setEditingLecturer(l);
     setFormName(l.name);
-    setFormCode(l.lecturer_code || l.code || '');
+    setFormCode(l.lecturer_code || '');
     setFormKbkId(l.kbk_id || '');
     setFormNip(l.nip || '');
     setFormEmail(l.email || '');
@@ -559,7 +559,7 @@ export const LecturersPage: React.FC = () => {
                     </td>
 
                     <td className="py-3 px-4 font-mono font-bold text-blue-600">
-                      {lecturer.lecturer_code || lecturer.code || '—'}
+                      {lecturer.lecturer_code || '—'}
                     </td>
 
                     <td className="py-3 px-4 text-slate-700 font-medium">

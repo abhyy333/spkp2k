@@ -714,7 +714,7 @@ export const CourseOfferingsPage: React.FC = () => {
                       <div>
                         <p className="font-bold text-slate-800">{item.lecturer?.name || 'Dosen'}</p>
                         <p className="text-2xs text-slate-400 font-mono">
-                          Kode: {item.lecturer?.lecturer_code || item.lecturer?.code || '—'} • NIP: {item.lecturer?.nip || '—'}
+                          Kode: {item.lecturer?.lecturer_code || '—'} • NIP: {item.lecturer?.nip || '—'}
                         </p>
                       </div>
                       <span className="px-2 py-0.5 rounded font-semibold text-2xs bg-blue-50 text-blue-700 border border-blue-200">
