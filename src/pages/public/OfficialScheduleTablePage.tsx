@@ -155,7 +155,8 @@ export const OfficialScheduleTablePage: React.FC = () => {
       setTargetEntryForReschedule(entryObj);
       setIsSuggestionModalOpen(true);
     } catch (err: any) {
-      toast.error('Gagal menyiapkan data rescheduling.');
+      console.error('Smart Rescheduling failed to load master data:', err);
+      toast.error(err?.message || 'Gagal menyiapkan data rescheduling.');
     }
   };
 
@@ -587,30 +588,43 @@ export const OfficialScheduleTablePage: React.FC = () => {
           offerings={rescheduleMasterData.offerings}
           lecturers={rescheduleMasterData.lecturers}
           onApplyEntries={async (newEntries) => {
+            // Update only entries that actually changed and verify every write.
+            const oldById = new Map(schedules.map((entry) => [entry.id, entry]));
+            const updates = newEntries
+              .filter((entry) => entry.id && !entry.id.startsWith('temp-'))
+              .filter((entry) => {
+                const old = oldById.get(entry.id);
+                return old && (
+                  old.room_id !== entry.room_id ||
+                  old.day_of_week !== entry.day_of_week ||
+                  old.start_minute !== entry.start_minute ||
+                  old.end_minute !== entry.end_minute
+                );
+              })
+              .map((entry) => ({
+                id: entry.id,
+                room_id: entry.room_id,
+                day_of_week: entry.day_of_week,
+                start_minute: entry.start_minute,
+                end_minute: entry.end_minute,
+              }));
+
+            if (updates.length === 0) {
+              throw new Error('Tidak ada perubahan jadwal yang valid.');
+            }
+
+            const persisted = await scheduleEntriesService.batchUpdateEntries(updates);
+            if (!persisted) {
+              throw new Error('Perubahan jadwal ditolak atau tidak berhasil disimpan.');
+            }
+
+            const refreshed = await schedulesService.getPublishedSchedule();
+            if (refreshed.length === 0) {
+              throw new Error('Jadwal berubah, tetapi hasil belum dapat dimuat ulang.');
+            }
+            setSchedules(refreshed);
             setIsSuggestionModalOpen(false);
             setTargetEntryForReschedule(null);
-            try {
-              // Direct update to schedule entries in workspace/active schedule without creating an auto-version
-              const updates = newEntries
-                .filter((e) => e.id && !e.id.startsWith('temp-'))
-                .map((e) => ({
-                  id: e.id,
-                  room_id: e.room_id,
-                  day_of_week: e.day_of_week,
-                  start_minute: e.start_minute,
-                  end_minute: e.end_minute,
-                }));
-              if (updates.length > 0) {
-                await scheduleEntriesService.batchUpdateEntries(updates);
-              }
-              toast.success('Rekomendasi jadwal berhasil diterapkan ke Jadwal Perkuliahan.');
-            } catch (err: any) {
-              console.error('Error applying rescheduling updates:', err);
-              toast.error('Gagal menyimpan hasil perubahan jadwal.');
-            }
-            // Refresh schedule
-            const refreshed = await schedulesService.getPublishedSchedule();
-            setSchedules(refreshed);
           }}
         />
       )}
