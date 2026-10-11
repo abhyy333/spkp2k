@@ -773,6 +773,26 @@ export const AccountManagementPage: React.FC = () => {
         </div>
       )}
 
+      {createdLecturerAccount && (
+        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-slate-900/50">
+          <div role="dialog" aria-modal="true" aria-label="Kredensial akun dosen" className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl space-y-4">
+            <h3 className="font-bold text-slate-900">Akun Dosen Berhasil Dibuat</h3>
+            <p className="text-xs text-slate-600">Catat kredensial dan berikan kepada dosen secara aman. Kata sandi sementara hanya ditampilkan di sini.</p>
+            <div className="text-xs space-y-3">
+              <div>
+                <label className="block font-medium mb-1">Email Login</label>
+                <input readOnly className="w-full p-2 border rounded-lg bg-slate-50" value={createdLecturerAccount.email} />
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Kata Sandi Sementara</label>
+                <input readOnly className="w-full p-2 border rounded-lg bg-slate-50 font-mono" value={createdLecturerAccount.temporaryPassword} />
+              </div>
+            </div>
+            <button type="button" onClick={() => setCreatedLecturerAccount(null)} className="w-full py-2 bg-blue-600 text-white rounded-lg text-xs font-semibold">Selesai</button>
+          </div>
+        </div>
+      )}
+
       {/* ACTION CONFIRMATION DIALOG */}
       <ConfirmDialog
         isOpen={dialogConfig.isOpen}
