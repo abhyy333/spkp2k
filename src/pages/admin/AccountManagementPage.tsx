@@ -108,6 +108,9 @@ export const AccountManagementPage: React.FC = () => {
   // Filter accounts by tab and search
   const adminAccounts = accounts.filter((a) => a.role === 'ADMIN');
   const lecturerAccounts = accounts.filter((a) => a.role === 'DOSEN');
+  const selectedLinkedLecturer = lecturerAccounts.find(
+    (a) => a.lecturer_id === selectedLecturerId
+  );
 
   const filteredAccounts = (activeTab === 'ADMIN' ? adminAccounts : lecturerAccounts).filter((acc) => {
     const q = searchQuery.toLowerCase().trim();
@@ -724,7 +727,7 @@ export const AccountManagementPage: React.FC = () => {
             </div>
 
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-2xs text-purple-900 leading-relaxed">
-              Satu dosen hanya boleh terhubung ke satu email otorisasi aktif. Dosen dapat mendaftar sendiri menggunakan email ini untuk mengelola ketersediaan dan melihat jadwal mengampu.
+              Admin membuat akun dosen menggunakan email login yang diinput manual. Jika dosen sudah memiliki akun, email baru akan memperbarui akun yang sama tanpa pendaftaran ulang.
             </div>
 
             <form onSubmit={handleAddLecturerSubmit} className="space-y-4 text-xs">
@@ -747,9 +750,15 @@ export const AccountManagementPage: React.FC = () => {
                 </select>
               </div>
 
+              {selectedLinkedLecturer && (
+                <div className="p-3 rounded-xl bg-amber-50 border border-amber-200 text-2xs text-amber-900">
+                  Akun sudah terdaftar: <strong>{selectedLinkedLecturer.email}</strong>.
+                  Masukkan email baru untuk mengganti alamat login akun ini.
+                </div>
+              )}
               <div>
                 <label className="block font-semibold text-slate-700 mb-1.5">
-                  Alamat Email Dosen *
+                  Alamat Email Login Dosen *
                 </label>
                 <div className="relative">
                   <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
@@ -778,7 +787,7 @@ export const AccountManagementPage: React.FC = () => {
                   disabled={submittingLecturer}
                   className="px-4 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-xs disabled:opacity-50 cursor-pointer"
                 >
-                  {submittingLecturer ? 'Mendaftarkan...' : 'Daftarkan Akun Dosen'}
+                  {submittingLecturer ? 'Menyimpan...' : selectedLinkedLecturer ? 'Ganti Email Login' : 'Daftarkan Akun Dosen'}
                 </button>
               </div>
             </form>
