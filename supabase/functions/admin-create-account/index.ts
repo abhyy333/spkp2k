@@ -1,230 +1,188 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.117.1"
+import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+function json(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
 }
 
-serve(async (req) => {
-  // Handle CORS
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+function randomPassword(length = 16) {
+  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
+  const bytes = new Uint32Array(length);
+  crypto.getRandomValues(bytes);
+  return Array.from(bytes, (n) => alphabet[n % alphabet.length]).join('');
+}
+
+function normalizeNip(value: unknown) {
+  return String(value ?? '').replace(/\D/g, '');
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method !== 'POST') return json({ code: 'METHOD_NOT_ALLOWED' }, 405);
+
+  const supabaseUrl = Deno.env.get('SUPABASE_URL');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (!supabaseUrl || !serviceRoleKey) return json({ code: 'SERVER_CONFIG_ERROR' }, 500);
+
+  const authHeader = req.headers.get('Authorization') ?? '';
+  const jwt = authHeader.startsWith('Bearer ') ? authHeader.slice(7) : '';
+  if (!jwt) return json({ code: 'SESSION_EXPIRED' }, 401);
+
+  const admin = createClient(supabaseUrl, serviceRoleKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+
+  const { data: callerData, error: callerError } = await admin.auth.getUser(jwt);
+  const caller = callerData?.user;
+  if (callerError || !caller) return json({ code: 'SESSION_EXPIRED' }, 401);
+
+  const { data: callerAccount, error: callerAccountError } = await admin
+    .from('authorized_accounts')
+    .select('email,role,is_active,is_system_owner,user_id')
+    .eq('user_id', caller.id)
+    .eq('is_active', true)
+    .maybeSingle();
+
+  if (callerAccountError) return json({ code: 'AUTHORIZATION_CHECK_FAILED' }, 500);
+  if (!callerAccount || callerAccount.role !== 'ADMIN') return json({ code: 'FORBIDDEN' }, 403);
+
+  let payload: any;
+  try { payload = await req.json(); }
+  catch { return json({ code: 'INVALID_BODY' }, 400); }
+
+  const lecturerId = payload?.lecturer_id ? String(payload.lecturer_id).trim() : null;
+  const requestedRole = String(payload?.role ?? (lecturerId ? 'DOSEN' : 'ADMIN')).trim().toUpperCase();
+  if (!['ADMIN', 'DOSEN'].includes(requestedRole)) return json({ code: 'INVALID_ROLE' }, 400);
+
+  let email = '';
+  let fullName = '';
+  let temporaryPassword = '';
+  let nip: string | null = null;
+
+  if (requestedRole === 'DOSEN') {
+    if (!lecturerId) return json({ code: 'LECTURER_REQUIRED' }, 400);
+
+    const { data: lecturer, error: lecturerError } = await admin
+      .from('lecturers')
+      .select('id,name,nip,profile_id,status')
+      .eq('id', lecturerId)
+      .maybeSingle();
+
+    if (lecturerError) return json({ code: 'LECTURER_LOOKUP_FAILED' }, 500);
+    if (!lecturer) return json({ code: 'LECTURER_NOT_FOUND' }, 404);
+    if (lecturer.status !== 'Aktif') return json({ code: 'LECTURER_INACTIVE' }, 409);
+    if (lecturer.profile_id) return json({ code: 'LECTURER_ALREADY_LINKED' }, 409);
+
+    // NIP is academic identity only; login always uses the Admin-entered email.
+    nip = normalizeNip(lecturer.nip) || null;
+
+    const { data: linkedAccount, error: linkedError } = await admin
+      .from('authorized_accounts')
+      .select('email,user_id,lecturer_id')
+      .eq('lecturer_id', lecturerId)
+      .limit(1)
+      .maybeSingle();
+    if (linkedError) return json({ code: 'ACCOUNT_LOOKUP_FAILED' }, 500);
+    if (linkedAccount?.user_id) return json({ code: 'LECTURER_ALREADY_LINKED' }, 409);
+
+    email = String(payload?.email ?? '').trim().toLowerCase();
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.endsWith('@auth.spkjte.local') || email.endsWith('.local')) {
+      return json({ code: 'INVALID_EMAIL', message: 'Masukkan email login yang valid.' }, 400);
+    }
+    fullName = String(lecturer.name ?? '').trim();
+    temporaryPassword = randomPassword();
+  } else {
+    email = String(payload?.email ?? '').trim().toLowerCase();
+    fullName = String(payload?.full_name ?? '').trim();
+    if (!email || !email.includes('@') || !fullName) return json({ code: 'INVALID_INPUT' }, 400);
+    if (lecturerId) return json({ code: 'ADMIN_LECTURER_NOT_ALLOWED' }, 400);
+    temporaryPassword = randomPassword();
   }
 
-  try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
-    )
+  const { data: existingRows, error: existingError } = await admin
+    .from('authorized_accounts')
+    .select('email,role,lecturer_id,user_id,is_active,is_system_owner')
+    .ilike('email', email)
+    .limit(1);
+  if (existingError) return json({ code: 'ACCOUNT_LOOKUP_FAILED' }, 500);
 
-    // Authenticate caller (verify JWT and get user info)
-    const { data: { user: caller }, error: callerError } = await supabaseClient.auth.getUser()
-    if (callerError || !caller) {
-      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', message: 'Izin ditolak.' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Connect to admin DB client (with service role to perform auth operations)
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { autoRefreshToken: false, persistSession: false } }
-    )
-
-    // Verify if caller is actually an active ADMIN in authorized_accounts
-    const { data: callerAuth, error: authCheckError } = await supabaseAdmin
-      .from('authorized_accounts')
-      .select('role, is_active')
-      .eq('user_id', caller.id)
-      .eq('is_active', true)
-      .eq('role', 'ADMIN')
-      .maybeSingle()
-
-    if (authCheckError || !callerAuth) {
-      return new Response(JSON.stringify({ error: 'UNAUTHORIZED', message: 'Hanya administrator yang dapat melakukan tindakan ini.' }), {
-        status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Get input parameters
-    const { email, full_name, role, lecturer_id } = await req.json()
-    const cleanEmail = email?.trim().toLowerCase()
-    const cleanRole = role?.trim().toUpperCase()
-
-    if (!cleanEmail || !cleanEmail.includes('@')) {
-      return new Response(JSON.stringify({ error: 'INVALID_INPUT', message: 'Format email tidak valid.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    if (cleanRole !== 'ADMIN' && cleanRole !== 'DOSEN') {
-      return new Response(JSON.stringify({ error: 'INVALID_INPUT', message: 'Role tidak valid.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    if (cleanRole === 'DOSEN' && !lecturer_id) {
-      return new Response(JSON.stringify({ error: 'LECTURER_REQUIRED', message: 'Dosen pengampu wajib dipilih.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Check if lecturer exists and is not already linked to another active account
-    if (cleanRole === 'DOSEN' && lecturer_id) {
-      const { data: lecturer, error: lecturerError } = await supabaseAdmin
-        .from('lecturers')
-        .select('id, name')
-        .eq('id', lecturer_id)
-        .maybeSingle()
-
-      if (lecturerError || !lecturer) {
-        return new Response(JSON.stringify({ error: 'LECTURER_NOT_FOUND', message: 'Dosen tidak ditemukan.' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-
-      const { data: existingLink } = await supabaseAdmin
-        .from('authorized_accounts')
-        .select('email')
-        .eq('lecturer_id', lecturer_id)
-        .eq('is_active', true)
-        .maybeSingle()
-
-      if (existingLink && existingLink.email?.toLowerCase() !== cleanEmail) {
-        return new Response(JSON.stringify({ error: 'LECTURER_ALREADY_LINKED', message: 'Dosen tersebut sudah memiliki akun.' }), {
-          status: 409,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        })
-      }
-    }
-
-    // Check duplicate email
-    const { data: existingEmail } = await supabaseAdmin
-      .from('authorized_accounts')
-      .select('email')
-      .eq('email', cleanEmail)
-      .eq('is_active', true)
-      .maybeSingle()
-
-    if (existingEmail) {
-      return new Response(JSON.stringify({ error: 'EMAIL_ALREADY_EXISTS', message: 'Email sudah terdaftar.' }), {
-        status: 409,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // Generate cryptographically secure temporary password (16 chars)
-    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*'
-    const array = new Uint8Array(16)
-    crypto.getRandomValues(array)
-    let tempPassword = 'JTE-'
-    for (let i = 0; i < 12; i++) {
-      tempPassword += chars[array[i] % chars.length]
-    }
-
-    // Create auth user
-    const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
-      email: cleanEmail,
-      password: tempPassword,
-      email_confirm: true,
-      user_metadata: {
-        full_name: full_name || (cleanRole === 'ADMIN' ? 'Administrator' : 'Dosen'),
-      }
-    })
-
-    if (createUserError || !newUser?.user) {
-      return new Response(JSON.stringify({ error: 'AUTH_CREATION_FAILED', message: createUserError?.message || 'Gagal membuat pengguna auth.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    const userId = newUser.user.id
-
-    // Create applications records
-    // 1. authorized_accounts
-    const { error: insertAuthError } = await supabaseAdmin
-      .from('authorized_accounts')
-      .upsert({
-        email: cleanEmail,
-        role: cleanRole,
-        user_id: userId,
-        lecturer_id: cleanRole === 'DOSEN' ? lecturer_id : null,
-        is_active: true,
-        must_change_password: true,
-        created_by: caller.id,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'email' })
-
-    if (insertAuthError) {
-      // Rollback auth user
-      await supabaseAdmin.auth.admin.deleteUser(userId)
-      return new Response(JSON.stringify({ error: 'DB_CREATION_FAILED', message: 'Gagal membuat data otorisasi akun.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // 2. profiles
-    const { error: insertProfileError } = await supabaseAdmin
-      .from('profiles')
-      .upsert({
-        id: userId,
-        email: cleanEmail,
-        name: full_name || (cleanRole === 'ADMIN' ? 'Administrator' : 'Dosen'),
-        full_name: full_name || (cleanRole === 'ADMIN' ? 'Administrator' : 'Dosen'),
-        role: cleanRole,
-        is_active: true,
-        updated_at: new Date().toISOString()
-      }, { onConflict: 'id' })
-
-    if (insertProfileError) {
-      // Rollback auth user
-      await supabaseAdmin.auth.admin.deleteUser(userId)
-      return new Response(JSON.stringify({ error: 'DB_CREATION_FAILED', message: 'Gagal membuat profil akun.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
-    }
-
-    // 3. Update lecturers table if DOSEN
-    if (cleanRole === 'DOSEN' && lecturer_id) {
-      const { error: updateLecturerError } = await supabaseAdmin
-        .from('lecturers')
-        .update({
-          profile_id: userId,
-          email: cleanEmail,
-        })
-        .eq('id', lecturer_id)
-
-      if (updateLecturerError) {
-        console.warn('Warning: Gagal menghubungkan dosen ke profil:', updateLecturerError)
-      }
-    }
-
-    return new Response(JSON.stringify({
-      success: true,
-      user_id: userId,
-      email: cleanEmail,
-      temporary_password: tempPassword,
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
-
-  } catch (err: any) {
-    return new Response(JSON.stringify({ error: 'UNKNOWN', message: err.message || 'Terjadi kesalahan internal.' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    })
+  const existing = existingRows?.[0] ?? null;
+  if (existing?.user_id) {
+    return json({ code: requestedRole === 'DOSEN' ? 'LECTURER_ALREADY_LINKED' : 'EMAIL_ALREADY_EXISTS' }, 409);
   }
-})
+  if (existing && (existing.role !== requestedRole || (existing.lecturer_id ?? null) !== lecturerId)) {
+    return json({ code: 'PREAUTHORIZED_ACCOUNT_CONFLICT' }, 409);
+  }
+
+  let insertedPreauth = false;
+  if (!existing) {
+    const { error: preauthError } = await admin.from('authorized_accounts').insert({
+      email,
+      role: requestedRole,
+      lecturer_id: requestedRole === 'DOSEN' ? lecturerId : null,
+      user_id: null,
+      is_active: true,
+      is_system_owner: false,
+      must_change_password: true,
+      created_by: caller.id,
+    });
+    if (preauthError) return json({ code: 'PREAUTH_CREATE_FAILED' }, 500);
+    insertedPreauth = true;
+  } else {
+    const { error: preauthUpdateError } = await admin
+      .from('authorized_accounts')
+      .update({ is_active: true, must_change_password: true, updated_at: new Date().toISOString() })
+      .eq('email', existing.email);
+    if (preauthUpdateError) return json({ code: 'PREAUTH_UPDATE_FAILED' }, 500);
+  }
+
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email,
+    password: temporaryPassword,
+    email_confirm: true,
+    user_metadata: { full_name: fullName },
+  });
+
+  if (createError || !created.user) {
+    if (insertedPreauth) {
+      await admin.from('authorized_accounts').delete().eq('email', email).is('user_id', null);
+    }
+    const msg = (createError?.message ?? '').toLowerCase();
+    if (msg.includes('already') || msg.includes('registered') || msg.includes('exists')) {
+      return json({ code: requestedRole === 'DOSEN' ? 'LECTURER_ACCOUNT_EXISTS' : 'EMAIL_ALREADY_EXISTS' }, 409);
+    }
+    return json({ code: 'AUTH_CREATE_FAILED' }, 500);
+  }
+
+  const userId = created.user.id;
+
+  const { error: finalizeError } = await admin
+    .from('authorized_accounts')
+    .update({ must_change_password: true, updated_at: new Date().toISOString() })
+    .eq('email', email)
+    .eq('user_id', userId);
+
+  if (finalizeError) {
+    await admin.auth.admin.deleteUser(userId);
+    if (insertedPreauth) await admin.from('authorized_accounts').delete().eq('email', email).is('user_id', null);
+    return json({ code: 'ACCOUNT_FINALIZE_FAILED' }, 500);
+  }
+
+  return json({
+    success: true,
+    user_id: userId,
+    email,
+    role: requestedRole,
+    lecturer_id: requestedRole === 'DOSEN' ? lecturerId : null,
+    nip,
+    temporary_password: temporaryPassword,
+  });
+});
