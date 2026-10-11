@@ -46,7 +46,7 @@ interface SmartSuggestionModalProps {
   availabilities: LecturerAvailability[];
   offerings: CourseOffering[];
   lecturers: Lecturer[];
-  onApplyEntries: (newEntries: ScheduleEntry[]) => void;
+  onApplyEntries: (newEntries: ScheduleEntry[]) => Promise<void> | void;
 }
 
 export const SmartSuggestionModal: React.FC<SmartSuggestionModalProps> = ({
@@ -146,13 +146,18 @@ export const SmartSuggestionModal: React.FC<SmartSuggestionModalProps> = ({
     setIsApplyingId(suggestion.id);
     try {
       const updatedEntries = applySuggestionToEntries(currentEntries, suggestion, rooms);
-      onApplyEntries(updatedEntries);
+      await onApplyEntries(updatedEntries);
 
       // Update suggestion status in local state and db
       setSuggestions((prev) =>
         prev.map((s) => (s.id === suggestion.id ? { ...s, status: 'APPLIED' } : s))
       );
-      await scheduleSuggestionsService.applySuggestion(suggestion.id);
+      // Status tracking is best-effort; persisting the schedule is authoritative.
+      try {
+        await scheduleSuggestionsService.applySuggestion(suggestion.id);
+      } catch (statusError) {
+        console.warn('Suggestion status could not be updated:', statusError);
+      }
 
       toast.success(`Saran untuk ${suggestion.courseName} berhasil diterapkan!`);
     } catch (err: any) {
@@ -187,7 +192,13 @@ export const SmartSuggestionModal: React.FC<SmartSuggestionModalProps> = ({
     }
 
     if (count > 0) {
-      onApplyEntries(workingEntries);
+      try {
+        await onApplyEntries(workingEntries);
+      } catch (error) {
+        console.error('Batch rescheduling failed:', error);
+        toast.error('Gagal menyimpan perubahan jadwal.');
+        return;
+      }
       setSuggestions((prev) =>
         prev.map((s) => (appliedOffIds.has(s.courseOfferingId) ? { ...s, status: 'APPLIED' } : s))
       );
