@@ -260,6 +260,34 @@ export const authorizedAccountsService = {
     }
   },
 
+  async updateLecturerLoginEmail(lecturerId: string, email: string): Promise<void> {
+    const cleanEmail = email.trim().toLowerCase();
+    if (!lecturerId || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) {
+      throw new Error('Masukkan alamat email yang valid.');
+    }
+    const { data, error } = await supabase.functions.invoke('admin-create-account', {
+      body: {
+        action: 'UPDATE_LECTURER_EMAIL',
+        lecturer_id: lecturerId,
+        email: cleanEmail,
+      },
+    });
+    const code = data?.code || data?.error;
+    if (error || !data?.success) {
+      const messageByCode: Record<string, string> = {
+        SAME_EMAIL: 'Alamat email baru sama dengan email yang sudah terdaftar.',
+        EMAIL_ALREADY_EXISTS: 'Email sudah digunakan akun lain.',
+        ACCOUNT_NOT_FOUND: 'Akun dosen belum ditemukan.',
+        AUTH_ACCOUNT_MISMATCH: 'Email akun Auth dan otorisasi tidak cocok. Hubungi pengelola sistem.',
+        FORBIDDEN: 'Hanya Administrator yang boleh mengganti email login.',
+        AUTH_EMAIL_UPDATE_FAILED: 'Tidak dapat memperbarui email login di Supabase Auth.',
+        EMAIL_UPDATE_FAILED: 'Gagal menyimpan perubahan email login.',
+        INVALID_EMAIL: 'Alamat email tidak valid.',
+      };
+      throw new Error(messageByCode[code] || data?.message || error?.message || 'Gagal mengubah email login dosen.');
+    }
+  },
+
   /**
    * RESET KATA SANDI SERVER-SIDE OLEH ADMIN
    * Menghasilkan kata sandi sementara baru dan mewajibkan ganti sandi saat login
