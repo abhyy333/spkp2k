@@ -260,10 +260,7 @@ export const AccountManagementPage: React.FC = () => {
   // Helper for lecturer selection: auto fill lecturer email if available
   const handleLecturerSelectChange = (lecturerId: string) => {
     setSelectedLecturerId(lecturerId);
-    const lect = lecturers.find((l) => l.id === lecturerId);
-    if (lect && lect.email) {
-      setLecturerEmail(lect.email);
-    }
+    setLecturerEmail('');
   };
 
   return (
