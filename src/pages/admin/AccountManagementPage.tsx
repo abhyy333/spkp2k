@@ -29,8 +29,12 @@ import { authorizedAccountsService } from '../../services/authorizedAccounts.ser
 import { lecturersService } from '../../services/lecturers.service';
 import { AuthorizedAccount, Lecturer } from '../../types';
 import { OWNER_EMAIL } from '../../lib/authGuard';
+import { useAuth } from '../../contexts/AuthContext';
 
 export const AccountManagementPage: React.FC = () => {
+  const { user } = useAuth();
+  const currentUserEmail = user?.email?.trim().toLowerCase() || '';
+
   const [activeTab, setActiveTab] = useState<'ADMIN' | 'DOSEN'>('ADMIN');
   const [accounts, setAccounts] = useState<AuthorizedAccount[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
@@ -175,7 +179,16 @@ export const AccountManagementPage: React.FC = () => {
 
   // Handle Status Toggle (Activate / Deactivate) using email as Primary Key
   const handleToggleStatus = (acc: AuthorizedAccount) => {
-    if (acc.is_system_owner || acc.email.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+    const targetEmail = acc.email.trim().toLowerCase();
+
+    if (!acc.is_active && targetEmail === currentUserEmail) {
+      // Reactivation of self is harmless; this branch should not normally be reachable.
+    } else if (acc.is_active && targetEmail === currentUserEmail) {
+      toast.error('Anda tidak dapat menonaktifkan akun yang sedang digunakan.');
+      return;
+    }
+
+    if (acc.is_system_owner || targetEmail === OWNER_EMAIL.toLowerCase()) {
       toast.error('System Owner tidak boleh dinonaktifkan.');
       return;
     }
@@ -211,7 +224,13 @@ export const AccountManagementPage: React.FC = () => {
 
   // Handle Delete Authorization using email as Primary Key
   const handleDeleteAccount = (acc: AuthorizedAccount) => {
-    if (acc.is_system_owner || acc.email.toLowerCase() === OWNER_EMAIL.toLowerCase()) {
+    const targetEmail = acc.email.trim().toLowerCase();
+    if (targetEmail === currentUserEmail) {
+      toast.error('Anda tidak dapat menghapus otorisasi akun yang sedang digunakan.');
+      return;
+    }
+
+    if (acc.is_system_owner || targetEmail === OWNER_EMAIL.toLowerCase()) {
       toast.error('System Owner tidak boleh dihapus.');
       return;
     }
