@@ -30,7 +30,6 @@ export const coursesService = {
             code,
             name,
             semester,
-            sks,
             effective_sks,
             course_type,
             activity_type,
