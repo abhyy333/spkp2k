@@ -53,6 +53,7 @@ export const AccountManagementPage: React.FC = () => {
   const [lecturerModalOpen, setLecturerModalOpen] = useState(false);
   const [selectedLecturerId, setSelectedLecturerId] = useState('');
   const [lecturerEmail, setLecturerEmail] = useState('');
+  const [createdLecturerAccount, setCreatedLecturerAccount] = useState<{ email: string; temporaryPassword: string } | null>(null);
   const [submittingLecturer, setSubmittingLecturer] = useState(false);
 
   // Confirmation Dialog
@@ -164,8 +165,8 @@ export const AccountManagementPage: React.FC = () => {
 
     setSubmittingLecturer(true);
     try {
-      await authorizedAccountsService.addLecturerAccount(cleanEmail, selectedLecturerId);
-      toast.success('Akun dosen berhasil diotorisasi.');
+      const created = await authorizedAccountsService.addLecturerAccount(cleanEmail, selectedLecturerId);
+      setCreatedLecturerAccount({ email: created.email, temporaryPassword: created.temporaryPassword });
       setLecturerModalOpen(false);
       setSelectedLecturerId('');
       setLecturerEmail('');
