@@ -36,10 +36,8 @@ export const courseOfferingsService = {
             academic_term_id,
             course_id,
             class_code,
-            class_name,
             expected_students,
             assignment_confirmed,
-            is_verified,
             course:course_id (
               id,
               name,
