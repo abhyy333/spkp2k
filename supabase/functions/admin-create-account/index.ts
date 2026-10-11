@@ -94,7 +94,7 @@ Deno.serve(async (req) => {
     if (linkedAccount?.user_id) return json({ code: 'LECTURER_ALREADY_LINKED' }, 409);
 
     email = String(payload?.email ?? '').trim().toLowerCase();
-    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.endsWith('@auth.spkjte.local') || email.endsWith('.local')) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.endsWith('@auth.spkjte.local') || email.endsWith('.local')) {
       return json({ code: 'INVALID_EMAIL', message: 'Masukkan email login yang valid.' }, 400);
     }
     fullName = String(lecturer.name ?? '').trim();
