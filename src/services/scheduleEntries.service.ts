@@ -118,13 +118,15 @@ export const scheduleEntriesService = {
       if (updates.start_minute !== undefined) payload.start_minute = updates.start_minute;
       if (updates.end_minute !== undefined) payload.end_minute = updates.end_minute;
 
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('schedule_entries')
         .update(payload)
-        .eq('id', entryId);
+        .eq('id', entryId)
+        .select('id')
+        .maybeSingle();
 
-      if (error) {
-        console.error('Error updating schedule entry:', error);
+      if (error || !data?.id) {
+        console.error('Schedule entry update failed or blocked:', error || 'No rows updated');
         return false;
       }
       return true;
@@ -148,7 +150,7 @@ export const scheduleEntriesService = {
   ): Promise<boolean> {
     if (!isSupabaseConfigured() || entries.length === 0) return false;
     try {
-      await Promise.all(
+      const results = await Promise.all(
         entries.map((e) =>
           this.updateEntry(e.id, {
             room_id: e.room_id,
@@ -158,7 +160,8 @@ export const scheduleEntriesService = {
           })
         )
       );
-      return true;
+      // A Promise resolving to false is still a failed write.
+      return results.every(Boolean);
     } catch (err) {
       console.error('Exception batch updating entries:', err);
       return false;
