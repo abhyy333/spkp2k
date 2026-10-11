@@ -44,161 +44,117 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const isAdmin = role === 'ADMIN';
   const isDosen = role === 'DOSEN';
 
-  // Fetch profile with profiles table as the authoritative source of truth
+  // Resolve access strictly. Never fall back to another role.
   const fetchProfile = async (currentUser: User): Promise<Profile | null> => {
     const isOwner = currentUser.email?.toLowerCase() === OWNER_EMAIL.toLowerCase();
 
     if (!isSupabaseConfigured()) {
-      const displayName =
-        currentUser.user_metadata?.full_name ||
-        currentUser.user_metadata?.name ||
-        (isOwner ? 'System Administrator' : 'Dosen');
-      const fallbackProfile: Profile = {
-        id: currentUser.id,
-        email: currentUser.email || '',
-        name: displayName,
-        full_name: displayName,
-        role: isOwner ? 'ADMIN' : 'DOSEN',
-        is_active: true,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      };
-      setProfile(fallbackProfile);
-      setMustChangePassword(false);
-      return fallbackProfile;
+      return null;
     }
 
     try {
       const cleanEmail = (currentUser.email || '').trim().toLowerCase();
+      if (!cleanEmail) return null;
 
-      // 1. Fetch from profiles table
-      const { data: profData, error: profError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', currentUser.id)
-        .maybeSingle();
+      const [{ data: profData, error: profError }, { data: authAcc, error: authError }] =
+        await Promise.all([
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', currentUser.id)
+            .maybeSingle(),
+          supabase
+            .from('authorized_accounts')
+            .select('email, role, lecturer_id, user_id, is_active, is_system_owner, must_change_password')
+            .eq('email', cleanEmail)
+            .maybeSingle(),
+        ]);
+
+      // System owner must still resolve as ADMIN. Every other account must have
+      // one active authorization row linked to the same authenticated user.
+      if (!isOwner) {
+        if (authError || !authAcc || !authAcc.is_active) {
+          return null;
+        }
+        if (authAcc.user_id && authAcc.user_id !== currentUser.id) {
+          return null;
+        }
+        if (authAcc.role !== 'ADMIN' && authAcc.role !== 'DOSEN') {
+          return null;
+        }
+      }
+
+      const resolvedRole: UserRole = isOwner ? 'ADMIN' : (authAcc!.role as UserRole);
 
       let currentProfile: Profile | null = null;
-
       if (!profError && profData) {
         currentProfile = profData as Profile;
       }
 
-      // 2. If profile not yet created in public.profiles, check authorized_accounts or system owner
-      if (!currentProfile) {
-        const { data: authAcc } = await supabase
-          .from('authorized_accounts')
-          .select('*')
-          .eq('email', cleanEmail)
-          .maybeSingle();
+      // Do not silently reinterpret an ADMIN as DOSEN or vice versa.
+      if (currentProfile && currentProfile.role !== resolvedRole) {
+        console.error(
+          '[AUTH] Role mismatch between profiles and authorized_accounts.',
+          currentProfile.role,
+          resolvedRole
+        );
+        return null;
+      }
 
-        const resolvedRole: UserRole = isOwner ? 'ADMIN' : ((authAcc?.role as UserRole) || 'DOSEN');
+      if (!currentProfile) {
         const displayName =
           currentUser.user_metadata?.full_name ||
           currentUser.user_metadata?.name ||
-          (isOwner ? 'System Administrator' : 'Pengguna JTE');
+          (resolvedRole === 'ADMIN' ? 'Administrator' : 'Dosen');
 
-        // Create initial profile record
+        // Use only columns that actually exist in public.profiles.
         const { data: newProf, error: createErr } = await supabase
           .from('profiles')
           .insert({
             id: currentUser.id,
-            email: cleanEmail,
-            name: displayName,
             full_name: displayName,
             role: resolvedRole,
-            lecturer_id: authAcc?.lecturer_id || null,
             is_active: true,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
           })
           .select()
           .single();
 
-        if (!createErr && newProf) {
-          currentProfile = newProf as Profile;
-        } else {
-          // In-memory fallback
-          currentProfile = {
-            id: currentUser.id,
-            email: cleanEmail,
-            name: displayName,
-            full_name: displayName,
-            role: resolvedRole,
-            lecturer_id: authAcc?.lecturer_id || null,
-            is_active: true,
-          };
+        if (createErr || !newProf) {
+          console.error('[AUTH] Failed to create strict profile:', createErr);
+          return null;
         }
+        currentProfile = newProf as Profile;
       }
 
-      // 3. Verify active status
       if (currentProfile.is_active === false && !isOwner) {
-        await supabase.auth.signOut();
-        setUser(null);
-        setProfile(null);
-        setMustChangePassword(false);
-        setAuthStatus('UNAUTHENTICATED');
-        toast.error('Akun Anda dinonaktifkan. Hubungi Administrator Jurusan.');
         return null;
       }
 
-      // 4. Resolve lecturer_id if user is DOSEN and not yet linked
-      let lecturerId = currentProfile.lecturer_id || null;
-      if (currentProfile.role === 'DOSEN' && !lecturerId) {
-        // Check lecturers table by profile_id or email
+      // Lecturer linkage is metadata for DOSEN only; it never decides the role.
+      let lecturerId = authAcc?.lecturer_id || null;
+      if (resolvedRole === 'DOSEN' && !lecturerId) {
         const { data: lectData } = await supabase
           .from('lecturers')
           .select('id')
           .or(`profile_id.eq.${currentUser.id},email.eq.${cleanEmail}`)
           .maybeSingle();
-
-        if (lectData?.id) {
-          lecturerId = lectData.id;
-          currentProfile.lecturer_id = lectData.id;
-          // Sync to profiles
-          supabase
-            .from('profiles')
-            .update({ lecturer_id: lectData.id })
-            .eq('id', currentUser.id)
-            .then();
-        }
+        lecturerId = lectData?.id || null;
       }
 
-      // 5. Check must_change_password flag from authorized_accounts or profile
-      if (!isOwner) {
-        const { data: authAcc } = await supabase
-          .from('authorized_accounts')
-          .select('must_change_password')
-          .eq('email', cleanEmail)
-          .maybeSingle();
-
-        setMustChangePassword(Boolean(authAcc?.must_change_password || currentProfile.must_change_password));
-      } else {
-        setMustChangePassword(false);
-      }
+      setMustChangePassword(
+        isOwner ? false : Boolean(authAcc?.must_change_password)
+      );
 
       const verifiedProfile: Profile = {
         ...currentProfile,
+        role: resolvedRole,
         lecturer_id: lecturerId,
-        role: isOwner ? 'ADMIN' : currentProfile.role,
       };
 
       setProfile(verifiedProfile);
       return verifiedProfile;
     } catch (err: any) {
-      console.warn('Profile resolution notice:', err?.message || err);
-      if (isOwner) {
-        const fallback: Profile = {
-          id: currentUser.id,
-          email: currentUser.email || '',
-          name: 'System Administrator',
-          full_name: 'System Administrator',
-          role: 'ADMIN',
-          is_active: true,
-        };
-        setProfile(fallback);
-        return fallback;
-      }
+      console.error('[AUTH] Strict profile resolution failed:', err?.message || err);
       return null;
     }
   };
@@ -222,9 +178,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
       if (session?.user) {
         setUser(session.user);
-        await fetchProfile(session.user);
+        const resolvedProfile = await fetchProfile(session.user);
         if (mounted) {
-          setAuthStatus('AUTHENTICATED');
+          if (resolvedProfile) {
+            setAuthStatus('AUTHENTICATED');
+          } else {
+            await supabase.auth.signOut();
+            setUser(null);
+            setProfile(null);
+            setMustChangePassword(false);
+            setAuthStatus('UNAUTHENTICATED');
+          }
         }
       } else {
         setUser(null);
@@ -243,9 +207,17 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         authResolved = true;
         if (session?.user) {
           setUser(session.user);
-          await fetchProfile(session.user);
+          const resolvedProfile = await fetchProfile(session.user);
           if (mounted) {
-            setAuthStatus('AUTHENTICATED');
+            if (resolvedProfile) {
+              setAuthStatus('AUTHENTICATED');
+            } else {
+              await supabase.auth.signOut();
+              setUser(null);
+              setProfile(null);
+              setMustChangePassword(false);
+              setAuthStatus('UNAUTHENTICATED');
+            }
           }
         } else {
           if (mounted) {
@@ -304,16 +276,57 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         return { error: 'Email atau kata sandi tidak sesuai.' };
       }
 
+      const authorization = await authorizedAccountsService.checkAuthorization(cleanEmail);
+      if (!authorization.authorized) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        setMustChangePassword(false);
+        setAuthStatus('UNAUTHENTICATED');
+        return {
+          error:
+            authorization.message ||
+            'Akun tidak memiliki akses aktif. Hubungi Administrator Jurusan.',
+        };
+      }
+
       setUser(data.user);
       const prof = await fetchProfile(data.user);
       if (!prof) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        setMustChangePassword(false);
         setAuthStatus('UNAUTHENTICATED');
-        return { error: 'Akun Anda dinonaktifkan atau belum terdaftar. Hubungi Administrator Jurusan.' };
+        return {
+          error:
+            'Data akses akun tidak konsisten. Hubungi Administrator Jurusan untuk memperbaiki role akun.',
+        };
       }
 
-      const isOwner = cleanEmail === OWNER_EMAIL && prof?.role === 'ADMIN';
+      if (authorization.role && prof.role !== authorization.role) {
+        await supabase.auth.signOut();
+        setUser(null);
+        setProfile(null);
+        setMustChangePassword(false);
+        setAuthStatus('UNAUTHENTICATED');
+        return {
+          error:
+            'Role akun tidak sesuai dengan otorisasi. Login dibatalkan; sistem tidak akan memindahkan Anda ke role lain.',
+        };
+      }
+
+      const isOwner = cleanEmail === OWNER_EMAIL && prof.role === 'ADMIN';
+      const forcePasswordChange = Boolean(
+        authorization.mustChangePassword || prof.must_change_password
+      );
+      setMustChangePassword(forcePasswordChange);
       setAuthStatus('AUTHENTICATED');
-      return { role: prof?.role, isOwner, mustChangePassword };
+      return {
+        role: prof.role,
+        isOwner,
+        mustChangePassword: forcePasswordChange,
+      };
     } catch (err: any) {
       setAuthStatus('UNAUTHENTICATED');
       return { error: 'Email atau kata sandi tidak sesuai.' };
