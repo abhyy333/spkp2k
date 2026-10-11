@@ -55,6 +55,21 @@ const UnifiedDashboard: React.FC = () => {
   return <AdminDashboard />;
 };
 
+/**
+ * Shared profile route.
+ * Admin uses the existing Settings page because it already contains the
+ * administrator profile editor; lecturers use their academic profile page.
+ */
+const UnifiedProfilePage: React.FC = () => {
+  const { role } = useAuth();
+
+  if (role === 'ADMIN') {
+    return <SettingsPage />;
+  }
+
+  return <LecturerProfilePage />;
+};
+
 export const AppRoutes: React.FC = () => {
   const { authStatus, isAuthenticated } = useAuth();
 
@@ -123,7 +138,7 @@ export const AppRoutes: React.FC = () => {
           path="/profil"
           element={
             <RoleGuard allowedRoles={['ADMIN', 'DOSEN']}>
-              <LecturerProfilePage />
+              <UnifiedProfilePage />
             </RoleGuard>
           }
         />
