@@ -163,16 +163,29 @@ export const AccountManagementPage: React.FC = () => {
       return;
     }
 
+    const existing = accounts.find(
+      (a) => a.role === 'DOSEN' && a.lecturer_id === selectedLecturerId
+    );
+    if (existing && existing.email.trim().toLowerCase() === cleanEmail) {
+      toast.error('Email login baru sama dengan email yang sudah terdaftar.');
+      return;
+    }
+
     setSubmittingLecturer(true);
     try {
-      const created = await authorizedAccountsService.addLecturerAccount(cleanEmail, selectedLecturerId);
-      setCreatedLecturerAccount({ email: created.email, temporaryPassword: created.temporaryPassword });
+      if (existing) {
+        await authorizedAccountsService.updateLecturerLoginEmail(selectedLecturerId, cleanEmail);
+        toast.success('Email login dosen berhasil diperbarui.');
+      } else {
+        const created = await authorizedAccountsService.addLecturerAccount(cleanEmail, selectedLecturerId);
+        setCreatedLecturerAccount({ email: created.email, temporaryPassword: created.temporaryPassword });
+      }
       setLecturerModalOpen(false);
       setSelectedLecturerId('');
       setLecturerEmail('');
       await loadData();
     } catch (err: any) {
-      toast.error(err.message || 'Gagal mendaftarkan akun dosen.');
+      toast.error(err.message || 'Gagal menyimpan akun dosen.');
     } finally {
       setSubmittingLecturer(false);
     }
