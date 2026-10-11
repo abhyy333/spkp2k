@@ -124,13 +124,20 @@ export const curriculumPackagesService = {
     try {
       const { data } = await supabase
         .from('courses')
-        .select('code, course_type, category');
+        .select('code, course_type');
 
       if (data) {
         data.forEach((c: any) => {
           if (c.code) {
-            const cat = c.category || (c.course_type === 'WAJIB' ? 'Wajib' : c.course_type === 'PILIHAN' ? 'Pilihan' : '-');
-            map.set(c.code.trim().toUpperCase(), cat);
+            const cat =
+              c.course_type === 'WAJIB'
+                ? 'Wajib'
+                : c.course_type === 'PILIHAN'
+                ? 'Pilihan'
+                : null;
+            if (cat) {
+              map.set(c.code.trim().toUpperCase(), cat);
+            }
           }
         });
       }
