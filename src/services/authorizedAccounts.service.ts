@@ -349,6 +349,12 @@ export const authorizedAccountsService = {
 
     const cleanEmail = email.trim().toLowerCase();
 
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const currentEmail = currentUser?.email?.trim().toLowerCase() || '';
+    if (!isActive && currentEmail && cleanEmail === currentEmail) {
+      throw new Error('Anda tidak dapat menonaktifkan akun yang sedang digunakan.');
+    }
+
     if (isSystemOwner || cleanEmail === OWNER_EMAIL.toLowerCase()) {
       throw new Error('System Owner tidak boleh dinonaktifkan.');
     }
@@ -375,6 +381,12 @@ export const authorizedAccountsService = {
     }
 
     const cleanEmail = email.trim().toLowerCase();
+
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+    const currentEmail = currentUser?.email?.trim().toLowerCase() || '';
+    if (currentEmail && cleanEmail === currentEmail) {
+      throw new Error('Anda tidak dapat menghapus otorisasi akun yang sedang digunakan.');
+    }
 
     if (isSystemOwner || cleanEmail === OWNER_EMAIL.toLowerCase()) {
       throw new Error('System Owner tidak boleh dihapus.');
