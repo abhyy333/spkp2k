@@ -53,6 +53,8 @@ export const AccountManagementPage: React.FC = () => {
   const [lecturerModalOpen, setLecturerModalOpen] = useState(false);
   const [selectedLecturerId, setSelectedLecturerId] = useState('');
   const [lecturerEmail, setLecturerEmail] = useState('');
+  const [lecturerTemporaryPassword, setLecturerTemporaryPassword] = useState('');
+  const [showLecturerTemporaryPassword, setShowLecturerTemporaryPassword] = useState(false);
   const [createdLecturerAccount, setCreatedLecturerAccount] = useState<{ email: string; temporaryPassword: string } | null>(null);
   const [submittingLecturer, setSubmittingLecturer] = useState(false);
 
@@ -169,6 +171,10 @@ export const AccountManagementPage: React.FC = () => {
     const existing = accounts.find(
       (a) => a.role === 'DOSEN' && a.lecturer_id === selectedLecturerId
     );
+    if (!existing && lecturerTemporaryPassword.length < 8) {
+      toast.error('Kata sandi sementara minimal 8 karakter.');
+      return;
+    }
     if (existing && existing.email.trim().toLowerCase() === cleanEmail) {
       toast.error('Email login baru sama dengan email yang sudah terdaftar.');
       return;
@@ -180,12 +186,18 @@ export const AccountManagementPage: React.FC = () => {
         await authorizedAccountsService.updateLecturerLoginEmail(selectedLecturerId, cleanEmail);
         toast.success('Email login dosen berhasil diperbarui.');
       } else {
-        const created = await authorizedAccountsService.addLecturerAccount(cleanEmail, selectedLecturerId);
+        const created = await authorizedAccountsService.addLecturerAccount(
+          cleanEmail,
+          selectedLecturerId,
+          lecturerTemporaryPassword
+        );
         setCreatedLecturerAccount({ email: created.email, temporaryPassword: created.temporaryPassword });
       }
       setLecturerModalOpen(false);
       setSelectedLecturerId('');
       setLecturerEmail('');
+      setLecturerTemporaryPassword('');
+      setShowLecturerTemporaryPassword(false);
       await loadData();
     } catch (err: any) {
       toast.error(err.message || 'Gagal menyimpan akun dosen.');
@@ -278,12 +290,16 @@ export const AccountManagementPage: React.FC = () => {
   const openLecturerModal = () => {
     setSelectedLecturerId('');
     setLecturerEmail('');
+    setLecturerTemporaryPassword('');
+    setShowLecturerTemporaryPassword(false);
     setLecturerModalOpen(true);
   };
 
   const handleLecturerSelectChange = (lecturerId: string) => {
     setSelectedLecturerId(lecturerId);
     setLecturerEmail('');
+    setLecturerTemporaryPassword('');
+    setShowLecturerTemporaryPassword(false);
   };
 
   return (
@@ -693,6 +709,37 @@ export const AccountManagementPage: React.FC = () => {
                 </div>
               </div>
 
+              {!selectedLinkedLecturer && (
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1.5">
+                    Kata Sandi Sementara *
+                  </label>
+                  <div className="relative">
+                    <input
+                      type={showLecturerTemporaryPassword ? 'text' : 'password'}
+                      required
+                      minLength={8}
+                      maxLength={72}
+                      autoComplete="new-password"
+                      name="lecturer-temporary-password"
+                      placeholder="Buat kata sandi sementara (min. 8 karakter)"
+                      value={lecturerTemporaryPassword}
+                      onChange={(e) => setLecturerTemporaryPassword(e.target.value)}
+                      className="w-full pl-3 pr-10 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowLecturerTemporaryPassword((visible) => !visible)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700"
+                      aria-label={showLecturerTemporaryPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'}
+                    >
+                      {showLecturerTemporaryPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-2xs text-slate-500">Ditentukan oleh Admin dan diberikan langsung kepada dosen.</p>
+                </div>
+              )}
+
               <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-100">
                 <button
                   type="button"
@@ -733,7 +780,7 @@ export const AccountManagementPage: React.FC = () => {
             </div>
 
             <div className="p-3 bg-purple-50 border border-purple-200 rounded-xl text-2xs text-purple-900 leading-relaxed">
-              Admin membuat akun dosen menggunakan email login yang diinput manual. Jika dosen sudah memiliki akun, email baru akan memperbarui akun yang sama tanpa pendaftaran ulang.
+              Admin mengisi email dan kata sandi sementara secara manual. Kata sandi minimal 8 karakter. Untuk dosen yang sudah memiliki akun, formulir hanya mengganti email login.
             </div>
 
             <form onSubmit={handleAddLecturerSubmit} className="space-y-4 text-xs">
