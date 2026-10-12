@@ -22,7 +22,7 @@ export const StatCard: React.FC<StatCardProps> = ({
   title,
   value,
   icon,
-  iconBgColor = 'bg-blue-50 text-blue-600',
+  iconBgColor: _iconBgColor = 'bg-blue-50 text-blue-600',
   trend,
   subtitle,
   progressBar,
@@ -31,15 +31,14 @@ export const StatCard: React.FC<StatCardProps> = ({
   return (
     <div
       className={cn(
-        'bg-white rounded-xl border border-slate-200/90 p-5 shadow-xs transition-all hover:shadow-sm',
+        'bg-white rounded-sm border border-slate-200 p-5',
         className
       )}
     >
       <div className="flex items-start gap-4">
         <div
           className={cn(
-            'w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border border-slate-100',
-            iconBgColor
+            'w-10 h-10 rounded-sm flex items-center justify-center shrink-0 border border-blue-100 bg-blue-50 text-blue-700'
           )}
         >
           {icon}
