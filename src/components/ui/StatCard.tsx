@@ -22,7 +22,6 @@ export const StatCard: React.FC<StatCardProps> = ({
   title,
   value,
   icon,
-  iconBgColor: _iconBgColor = 'bg-blue-50 text-blue-600',
   trend,
   subtitle,
   progressBar,
