@@ -72,9 +72,9 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
         title={collapsed ? item.label : undefined}
         className={({ isActive }) =>
           cn(
-            'flex items-center gap-3 px-3.5 py-2.5 rounded-xl text-xs font-medium transition-all group relative',
+            'flex items-center gap-3 px-3.5 py-2.5 rounded-sm text-xs font-medium transition-colors group relative',
             isActive
-              ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200/60 shadow-2xs'
+              ? 'bg-blue-50 text-blue-700 font-semibold border border-blue-200'
               : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100/70'
           )
         }
@@ -114,7 +114,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
       {/* Sidebar container */}
       <aside
         className={cn(
-          'fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-white border-r border-slate-200 transition-all duration-200 ease-in-out select-none shadow-sm',
+          'fixed top-0 bottom-0 left-0 z-40 flex flex-col bg-white border-r border-slate-200 transition-all duration-200 ease-in-out select-none',
           collapsed ? 'w-20' : 'w-60',
           mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
         )}
@@ -147,7 +147,7 @@ export const AppSidebar: React.FC<AppSidebarProps> = ({
           <div className="px-4 pt-3 pb-1">
             <span
               className={cn(
-                'inline-block px-2 py-0.5 rounded-md text-3xs font-bold uppercase tracking-wider',
+                'inline-block px-2 py-0.5 rounded-sm text-3xs font-bold uppercase tracking-wider',
                 isDosen
                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
                   : 'bg-blue-50 text-blue-700 border border-blue-200/60'
