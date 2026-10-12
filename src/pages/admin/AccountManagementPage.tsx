@@ -274,7 +274,13 @@ export const AccountManagementPage: React.FC = () => {
     });
   };
 
-  // Helper for lecturer selection: auto fill lecturer email if available
+  // Login email is always entered manually; never derive it from NIP or lecturer metadata.
+  const openLecturerModal = () => {
+    setSelectedLecturerId('');
+    setLecturerEmail('');
+    setLecturerModalOpen(true);
+  };
+
   const handleLecturerSelectChange = (lecturerId: string) => {
     setSelectedLecturerId(lecturerId);
     setLecturerEmail('');
@@ -305,7 +311,7 @@ export const AccountManagementPage: React.FC = () => {
               </button>
             ) : (
               <button
-                onClick={() => setLecturerModalOpen(true)}
+                onClick={openLecturerModal}
                 className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-all shadow-2xs cursor-pointer"
               >
                 <Plus className="w-4 h-4" />
@@ -582,7 +588,7 @@ export const AccountManagementPage: React.FC = () => {
                           <button
                             type="button"
                             onClick={() => {
-                              setLecturerEmail(acc.email);
+                              setLecturerEmail('');
                               setLecturerModalOpen(true);
                             }}
                             className="text-2xs font-bold text-blue-600 hover:underline cursor-pointer"
@@ -765,7 +771,10 @@ export const AccountManagementPage: React.FC = () => {
                   <input
                     type="email"
                     required
-                    placeholder="dosen@unram.ac.id"
+                    name="manual-lecturer-login-email"
+                    autoComplete="off"
+                    placeholder="Masukkan email login secara manual"
+                    key={selectedLecturerId || 'new-lecturer-email'}
                     value={lecturerEmail}
                     onChange={(e) => setLecturerEmail(e.target.value)}
                     className="w-full pl-9 pr-3 py-2 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
