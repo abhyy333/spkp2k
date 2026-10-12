@@ -10,35 +10,35 @@
   --color-blue-500: #3478f6;
   --color-blue-600: #2563eb;
   --color-blue-700: #1d4ed8;
-  --radius-xs: 2px;
-  --radius-sm: 2px;
-  --radius-md: 3px;
-  --radius-lg: 3px;
-  --radius-xl: 3px;
-  --radius-2xl: 3px;
-  --radius-3xl: 3px;
+  --radius-xs: 3px;
+  --radius-sm: 5px;
+  --radius-md: 7px;
+  --radius-lg: 9px;
+  --radius-xl: 12px;
+  --radius-2xl: 14px;
+  --radius-3xl: 18px;
 }
 
 :root {
   color-scheme: light;
-  --app-bg: #f4f6f9;
+  --app-bg: #f3f5f8;
   --app-surface: #ffffff;
   --app-surface-muted: #f8fafc;
-  --app-surface-raised: #f1f5f9;
-  --app-border: #d8dee8;
-  --app-text: #1f2937;
-  --app-text-muted: #64748b;
-  --app-primary: #2563eb;
-  --app-primary-hover: #1d4ed8;
-  --app-primary-soft: #eff6ff;
+  --app-surface-raised: #f5f7fa;
+  --app-border: #e1e5eb;
+  --app-text: #202938;
+  --app-text-muted: #526174;
+  --app-primary: #4272d7;
+  --app-primary-hover: #355cb8;
+  --app-primary-soft: #eaf0fc;
   --app-success: #047857;
   --app-warning: #b45309;
   --app-danger: #be123c;
   --glass-bg: #ffffff;
   --glass-border: var(--app-border);
   --glass-shadow: none;
-  --surface-radius: 2px;
-  --event-radius: 2px;
+  --surface-radius: 9px;
+  --event-radius: 5px;
 }
 
 /* Dark theme tokens are activated when the app applies .dark or data-theme="dark". */
@@ -86,12 +86,12 @@ body,
   }
 }
 
-/* Flat, consistent surfaces. Keep avatars/circular indicators circular. */
+/* Quiet surfaces distinguish working areas without adding unnecessary elevation. */
 @layer components {
   .app-card {
     background: var(--app-surface);
     border: 1px solid var(--app-border);
-    border-radius: 2px;
+    border-radius: var(--surface-radius);
     box-shadow: none;
   }
 
@@ -99,7 +99,7 @@ body,
     background: var(--app-surface);
     color: var(--app-text);
     border: 1px solid var(--app-border);
-    border-radius: 3px;
+    border-radius: var(--radius-md);
   }
 
   .glass-panel,
@@ -112,18 +112,6 @@ body,
     backdrop-filter: none;
     -webkit-backdrop-filter: none;
   }
-}
-
-/* Retain compatibility with existing Tailwind card markup while flattening cards. */
-#root .bg-white.rounded-xl,
-#root .bg-white.rounded-2xl,
-#root .bg-white.rounded-lg,
-#root .bg-slate-50.rounded-xl.border,
-#root .bg-slate-50.rounded-2xl.border,
-#root .glass-card,
-#root .glass-panel {
-  border-radius: 2px !important;
-  box-shadow: none !important;
 }
 
 /* Dark mode compatibility for pages that still use light-theme Tailwind utilities. */
@@ -402,6 +390,29 @@ html[data-theme="dark"] #root td {
   background: #94a3b8;
 }
 
+/* Keyboard users need a clear location indicator on every surface and theme. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 3px solid #4272d7;
+  outline-offset: 2px;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 640px) {
+  #root main {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+}
+
+html:not(.dark) #root .text-slate-400,
+html:not([data-theme="dark"]) #root .text-gray-400 {
+  color: #64748b !important;
+}
+
 /* Academic Document Print Styles */
 @page {
   size: A4 landscape;
@@ -421,7 +432,7 @@ html[data-theme="dark"] #root td {
   aside,
   .glass-sidebar,
   .glass-topbar,
-  .print\\:hidden {
+    [class~="print:hidden"] {
     display: none !important;
   }
 

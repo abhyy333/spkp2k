@@ -11,7 +11,6 @@ import {
   ArrowRight,
   FileCheck,
   Calendar,
-  CheckCircle2,
 } from 'lucide-react';
 import { PageHeader } from '../../components/shared/PageHeader';
 import { StatCard } from '../../components/ui/StatCard';
@@ -92,7 +91,7 @@ export const AdminDashboard: React.FC = () => {
     : 'Belum diatur';
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-7">
       {/* Page Header with CTA */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <PageHeader
@@ -103,7 +102,7 @@ export const AdminDashboard: React.FC = () => {
         <button
           type="button"
           onClick={() => navigate('/penyusunan-jadwal')}
-          className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 active:bg-blue-800 shadow-xs transition-all cursor-pointer shrink-0"
+          className="inline-flex min-h-11 items-center gap-2 px-5 py-2.5 rounded-md text-sm font-semibold text-white bg-[#4272d7] hover:bg-[#355cb8] transition-colors cursor-pointer shrink-0"
         >
           <CalendarPlus className="w-4 h-4" />
           <span>Lanjutkan Penyusunan</span>
@@ -112,11 +111,11 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Main 7 Key Metrics Cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
         {/* Periode Aktif */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
           <div className="flex items-center gap-2.5 text-slate-500 mb-2">
-            <Clock className="w-4 h-4 text-blue-600 shrink-0" />
+            <Clock className="w-4 h-4 text-[#4272d7] shrink-0" />
             <span className="text-xs font-medium">Periode Aktif</span>
           </div>
           <p className="text-base font-bold text-slate-900 truncate">
@@ -126,9 +125,9 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Jumlah MK */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
           <div className="flex items-center gap-2.5 text-slate-500 mb-2">
-            <BookOpen className="w-4 h-4 text-emerald-600 shrink-0" />
+            <BookOpen className="w-4 h-4 text-[#4272d7] shrink-0" />
             <span className="text-xs font-medium">Jumlah Mata Kuliah</span>
           </div>
           <p className="text-2xl font-bold text-slate-900">{totalCourses}</p>
@@ -136,9 +135,9 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Jumlah Dosen */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
           <div className="flex items-center gap-2.5 text-slate-500 mb-2">
-            <Users className="w-4 h-4 text-indigo-600 shrink-0" />
+            <Users className="w-4 h-4 text-[#4272d7] shrink-0" />
             <span className="text-xs font-medium">Jumlah Dosen</span>
           </div>
           <p className="text-2xl font-bold text-slate-900">{totalLecturers}</p>
@@ -146,9 +145,9 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Jumlah Ruangan */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
           <div className="flex items-center gap-2.5 text-slate-500 mb-2">
-            <DoorClosed className="w-4 h-4 text-purple-600 shrink-0" />
+            <DoorClosed className="w-4 h-4 text-[#4272d7] shrink-0" />
             <span className="text-xs font-medium">Jumlah Ruangan</span>
           </div>
           <p className="text-2xl font-bold text-slate-900">{totalRooms}</p>
@@ -156,24 +155,25 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Status Penyusunan */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
           <div className="flex items-center gap-2.5 text-slate-500 mb-2">
-            <CalendarCheck className="w-4 h-4 text-amber-600 shrink-0" />
+            <CalendarCheck className="w-4 h-4 text-[#4272d7] shrink-0" />
             <span className="text-xs font-medium">Status Penyusunan</span>
           </div>
           <div className="flex items-center gap-2">
             <span
+              aria-hidden="true"
               className={`inline-block w-2.5 h-2.5 rounded-full ${
-                scheduleStatus === 'Diterbitkan' ? 'bg-emerald-500' : 'bg-amber-500'
+                scheduleStatus === 'Diterbitkan' ? 'bg-emerald-600' : 'bg-amber-600'
               }`}
             />
-            <p className="text-base font-bold text-slate-900">{scheduleStatus}</p>
+            <p className="text-sm font-bold text-slate-900">{scheduleStatus}</p>
           </div>
           <p className="text-2xs text-slate-400 mt-1">Status jadwal semester ini</p>
         </div>
 
         {/* Konflik Aktif */}
-        <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs">
+        <div className="bg-white rounded-lg border border-slate-200 p-5">
           <div className="flex items-center gap-2.5 text-slate-500 mb-2">
             <AlertTriangle className="w-4 h-4 text-rose-600 shrink-0" />
             <span className="text-xs font-medium">Konflik Aktif</span>
@@ -191,7 +191,7 @@ export const AdminDashboard: React.FC = () => {
         </div>
 
         {/* Jadwal Final Terakhir */}
-        <div className="col-span-2 sm:col-span-3 lg:col-span-2 bg-white rounded-2xl border border-slate-200 p-4 shadow-2xs flex flex-col justify-between">
+        <div className="sm:col-span-2 xl:col-span-2 bg-white rounded-lg border border-slate-200 p-5 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2.5 text-slate-500 mb-2">
               <FileCheck className="w-4 h-4 text-blue-600 shrink-0" />
@@ -235,40 +235,36 @@ export const AdminDashboard: React.FC = () => {
       </div>
 
       {/* Quick Access Action Card */}
-      <div className="bg-gradient-to-r from-blue-900 to-slate-900 rounded-2xl p-6 text-white shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
-        <div className="space-y-1">
-          <div className="inline-flex items-center gap-2 px-2.5 py-0.5 rounded-full bg-blue-500/20 text-blue-200 text-xs font-semibold">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            Alur Penyusunan SPK 4 Tahap
-          </div>
-          <h3 className="text-lg font-bold">Siapkan, Susun, Optimalkan, dan Finalisasi</h3>
-          <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
+      <section className="bg-white rounded-lg border border-slate-200 p-5 sm:p-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-5">
+        <div className="space-y-1.5">
+          <h3 className="text-base font-bold text-slate-900">Penyusunan jadwal perkuliahan</h3>
+          <p className="text-sm text-slate-600 max-w-2xl leading-relaxed">
             Penyusunan jadwal otomatis terintegrasi dengan Simulated Annealing dan Smart Rescheduling untuk mengeliminasi bentrok ruang dan dosen.
           </p>
         </div>
-        <div className="flex items-center gap-3 shrink-0">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shrink-0">
           <button
             type="button"
             onClick={() => navigate('/penyusunan-jadwal')}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-white text-slate-900 hover:bg-slate-100 transition-colors cursor-pointer"
+            className="min-h-11 px-4 py-2 rounded-md text-sm font-semibold bg-[#4272d7] text-white hover:bg-[#355cb8] transition-colors cursor-pointer"
           >
-            Lanjutkan Penyusunan
+            Buka penyusunan jadwal
           </button>
           <button
             type="button"
             onClick={() => navigate('/master-data')}
-            className="px-4 py-2 rounded-xl text-xs font-semibold bg-white/10 hover:bg-white/20 text-white transition-colors cursor-pointer"
+            className="min-h-11 px-4 py-2 rounded-md text-sm font-semibold border border-slate-300 text-slate-700 hover:bg-slate-50 transition-colors cursor-pointer"
           >
             Kelola Master Data
           </button>
         </div>
-      </div>
+      </section>
 
       {/* Recent Final Schedule Sample Table */}
       {recentFinalEntries.length > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden shadow-2xs">
+        <div className="bg-white rounded-lg border border-slate-200 overflow-hidden">
           <div className="p-4 border-b border-slate-100 flex items-center justify-between">
-            <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
+            <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Calendar className="w-4 h-4 text-blue-600" />
               Pratinjau Jadwal Final Aktif
             </h4>

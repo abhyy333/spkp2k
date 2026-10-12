@@ -47,7 +47,7 @@ export const AppLayout: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800 relative">
+    <div className="min-h-screen bg-[#f3f5f8] flex flex-col text-slate-800 relative">
       {/* Sidebar */}
       <AppSidebar
         collapsed={collapsed}
@@ -97,7 +97,7 @@ export const AppLayout: React.FC = () => {
           </div>
         )}
 
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto min-w-0">
+        <main className="flex-1 p-4 sm:p-6 lg:p-7 max-w-[1600px] w-full mx-auto min-w-0">
           <ErrorBoundary>
             <Outlet />
           </ErrorBoundary>

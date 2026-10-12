@@ -69,17 +69,16 @@ export const AppTopbar: React.FC<AppTopbarProps> = ({
       <button
         type="button"
         onClick={onOpenMobileSidebar}
-        className="p-2 rounded-sm text-slate-500 hover:text-slate-800 hover:bg-slate-100 lg:hidden cursor-pointer shrink-0"
+        className="min-h-11 min-w-11 flex items-center justify-center rounded-md text-slate-600 hover:text-slate-900 hover:bg-slate-100 lg:hidden cursor-pointer shrink-0"
         aria-label="Buka menu"
       >
         <Menu className="w-5 h-5" />
       </button>
 
       {/* Global Search Bar */}
-      <div className="flex-1 max-w-xl min-w-0">
+      <button type="button" onClick={onOpenSearch} aria-label="Buka pencarian" className="flex-1 max-w-xl min-w-0 text-left">
         <div
-          onClick={onOpenSearch}
-          className="w-full flex items-center gap-2 sm:gap-3 px-3 py-1.5 sm:py-2 rounded-sm cursor-pointer text-slate-400 text-xs sm:text-sm bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors"
+          className="w-full min-h-11 flex items-center gap-2 sm:gap-3 px-3 py-1.5 sm:py-2 rounded-md text-slate-400 text-xs sm:text-sm bg-slate-50 border border-slate-200 hover:bg-slate-100 transition-colors"
         >
           <Search className="w-4 h-4 text-slate-400 shrink-0" />
           <span className="truncate text-slate-500">
@@ -89,7 +88,7 @@ export const AppTopbar: React.FC<AppTopbarProps> = ({
             Ctrl + K
           </kbd>
         </div>
-      </div>
+      </button>
 
       {/* Right side items */}
       <div className="flex items-center gap-2 shrink-0">
@@ -98,7 +97,7 @@ export const AppTopbar: React.FC<AppTopbarProps> = ({
             <button
               type="button"
               onClick={() => setDropdownOpen(!dropdownOpen)}
-              className="flex items-center gap-2 p-1 sm:px-2.5 sm:py-1 rounded-sm hover:bg-slate-100 transition-colors cursor-pointer"
+              className="min-h-11 flex items-center gap-2 p-1 sm:px-2.5 sm:py-1 rounded-md hover:bg-slate-100 transition-colors cursor-pointer"
               aria-expanded={dropdownOpen}
             >
               {profile?.avatar_url ? (

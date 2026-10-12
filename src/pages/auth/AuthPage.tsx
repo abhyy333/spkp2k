@@ -89,15 +89,15 @@ export const AuthPage: React.FC = () => {
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[520px] h-[520px] bg-blue-100/40 rounded-full blur-3xl" />
       </div>
 
-      <div className="w-full max-w-md">
+      <div className="w-full min-w-0" style={{ width: 'min(100%, 28rem, calc(100vw - 2rem))' }}>
         {/* Main Auth Card */}
-        <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-6 sm:p-8">
+        <div className="w-full min-w-0 bg-white rounded-xl border border-slate-200 shadow-sm p-5 sm:p-8">
           {/* Logo and Header */}
           <div className="flex flex-col items-center text-center mb-6">
             <div className="mb-3">
               <UnramLogo size={56} />
             </div>
-            <h1 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-snug">
+            <h1 className="min-w-0 break-words text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-snug">
               SPK Penjadwalan JTE UNRAM
             </h1>
             <p className="text-xs sm:text-sm text-slate-500 font-medium mt-1">
@@ -116,8 +116,8 @@ export const AuthPage: React.FC = () => {
           {/* Database connection missing alert */}
           {!isSupabaseConfigured() && (
             <div className="mb-5 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-900 text-xs">
-              <div className="flex items-center justify-between mb-1 font-semibold">
-                <span className="flex items-center gap-1.5">
+              <div className="flex flex-col items-start gap-1 mb-1 font-semibold sm:flex-row sm:items-center sm:justify-between">
+                <span className="flex items-center gap-1.5 min-w-0">
                   <Database className="w-3.5 h-3.5 text-amber-600" />
                   Koneksi Belum Terhubung
                 </span>
@@ -129,7 +129,7 @@ export const AuthPage: React.FC = () => {
                   Konfigurasi
                 </button>
               </div>
-              <p className="text-2xs text-amber-700 leading-normal">
+              <p className="min-w-0 break-words text-2xs text-amber-700 leading-normal">
                 Tambahkan Supabase URL dan Publishable Key agar autentikasi dapat berfungsi.
               </p>
             </div>
@@ -158,7 +158,7 @@ export const AuthPage: React.FC = () => {
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
+              <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1.5">
                 <label className="block text-xs font-semibold text-slate-700">
                   Kata Sandi
                 </label>
@@ -222,7 +222,7 @@ export const AuthPage: React.FC = () => {
           {/* Info note */}
           <div className="mt-5 p-3 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs flex items-start gap-2.5">
             <Info className="w-4 h-4 text-blue-600 shrink-0 mt-0.5" />
-            <p className="leading-relaxed text-2xs">
+            <p className="min-w-0 leading-relaxed text-2xs">
               Sistem internal untuk Admin dan Dosen Jurusan Teknik Elektro. Akun dikelola langsung oleh Pengelola Jurusan.
             </p>
           </div>
