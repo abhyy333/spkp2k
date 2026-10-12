@@ -1,11 +1,63 @@
 @import "tailwindcss";
 
+/*
+ * SPKJTE design system
+ * CoolAdmin-inspired: flat surfaces, crisp borders, restrained blue accents.
+ */
+@theme {
+  --radius-xs: 2px;
+  --radius-sm: 2px;
+  --radius-md: 3px;
+  --radius-lg: 3px;
+  --radius-xl: 3px;
+  --radius-2xl: 3px;
+  --radius-3xl: 3px;
+}
+
 :root {
-  --glass-bg: rgba(255, 255, 255, 0.75);
-  --glass-border: rgba(255, 255, 255, 0.8);
-  --glass-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
-  --surface-radius: 20px;
-  --event-radius: 14px;
+  color-scheme: light;
+  --app-bg: #f4f6f9;
+  --app-surface: #ffffff;
+  --app-surface-muted: #f8fafc;
+  --app-surface-raised: #f1f5f9;
+  --app-border: #d8dee8;
+  --app-text: #1f2937;
+  --app-text-muted: #64748b;
+  --app-primary: #2563eb;
+  --app-primary-hover: #1d4ed8;
+  --app-primary-soft: #eff6ff;
+  --app-success: #047857;
+  --app-warning: #b45309;
+  --app-danger: #be123c;
+  --glass-bg: #ffffff;
+  --glass-border: var(--app-border);
+  --glass-shadow: none;
+  --surface-radius: 2px;
+  --event-radius: 2px;
+}
+
+/* Dark theme tokens are activated when the app applies .dark or data-theme="dark". */
+html.dark,
+body.dark,
+html[data-theme="dark"],
+body[data-theme="dark"] {
+  color-scheme: dark;
+  --app-bg: #191c24;
+  --app-surface: #232832;
+  --app-surface-muted: #20242d;
+  --app-surface-raised: #2b303b;
+  --app-border: #394150;
+  --app-text: #f1f5f9;
+  --app-text-muted: #a8b4c5;
+  --app-primary: #5b91ff;
+  --app-primary-hover: #83acff;
+  --app-primary-soft: #1d2d49;
+  --app-success: #34d399;
+  --app-warning: #fbbf24;
+  --app-danger: #fb7185;
+  --glass-bg: var(--app-surface);
+  --glass-border: var(--app-border);
+  --glass-shadow: none;
 }
 
 html,
@@ -17,12 +69,169 @@ body,
 }
 
 @layer base {
+  html {
+    background: var(--app-bg);
+  }
+
   body {
     font-family: 'Plus Jakarta Sans', Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-    background: linear-gradient(135deg, #F8FAFC 0%, #EEF4FF 50%, #F9FAFB 100%);
+    background: var(--app-bg);
     min-height: 100vh;
-    color: #1E293B;
+    color: var(--app-text);
   }
+}
+
+/* Flat, consistent surfaces. Keep avatars/circular indicators circular. */
+@layer components {
+  .app-card {
+    background: var(--app-surface);
+    border: 1px solid var(--app-border);
+    border-radius: 2px;
+    box-shadow: none;
+  }
+
+  .app-control {
+    background: var(--app-surface);
+    color: var(--app-text);
+    border: 1px solid var(--app-border);
+    border-radius: 3px;
+  }
+
+  .glass-panel,
+  .glass-card,
+  .glass-sidebar,
+  .glass-topbar {
+    background: var(--app-surface);
+    border-color: var(--app-border);
+    box-shadow: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+
+/* Retain compatibility with existing Tailwind card markup while flattening cards. */
+#root .bg-white.rounded-xl.border,
+#root .bg-white.rounded-2xl.border,
+#root .bg-white.rounded-lg.border,
+#root .glass-card,
+#root .glass-panel {
+  border-radius: 2px !important;
+  box-shadow: none !important;
+}
+
+/* Dark mode compatibility for pages that still use light-theme Tailwind utilities. */
+html.dark body,
+body.dark,
+html[data-theme="dark"] body,
+body[data-theme="dark"] {
+  background: var(--app-bg) !important;
+  color: var(--app-text);
+}
+
+html.dark #root .bg-white,
+body.dark #root .bg-white,
+html[data-theme="dark"] #root .bg-white,
+body[data-theme="dark"] #root .bg-white,
+html.dark #root [class~="bg-white/70"],
+html.dark #root [class~="bg-white/80"] {
+  background-color: var(--app-surface) !important;
+}
+
+html.dark #root .bg-slate-50,
+html.dark #root .bg-slate-100,
+html.dark #root .bg-gray-50,
+html.dark #root .bg-gray-100,
+body.dark #root .bg-slate-50,
+body.dark #root .bg-slate-100,
+body.dark #root .bg-gray-50,
+body.dark #root .bg-gray-100,
+html[data-theme="dark"] #root .bg-slate-50,
+html[data-theme="dark"] #root .bg-slate-100,
+html[data-theme="dark"] #root .bg-gray-50,
+html[data-theme="dark"] #root .bg-gray-100 {
+  background-color: var(--app-surface-muted) !important;
+}
+
+html.dark #root .text-slate-900,
+html.dark #root .text-slate-800,
+html.dark #root .text-gray-900,
+html.dark #root .text-gray-800,
+body.dark #root .text-slate-900,
+body.dark #root .text-slate-800,
+body.dark #root .text-gray-900,
+body.dark #root .text-gray-800,
+html[data-theme="dark"] #root .text-slate-900,
+html[data-theme="dark"] #root .text-slate-800,
+html[data-theme="dark"] #root .text-gray-900,
+html[data-theme="dark"] #root .text-gray-800 {
+  color: var(--app-text) !important;
+}
+
+html.dark #root .text-slate-700,
+html.dark #root .text-slate-600,
+html.dark #root .text-slate-500,
+html.dark #root .text-gray-700,
+html.dark #root .text-gray-600,
+html.dark #root .text-gray-500,
+body.dark #root .text-slate-700,
+body.dark #root .text-slate-600,
+body.dark #root .text-slate-500,
+body.dark #root .text-gray-700,
+body.dark #root .text-gray-600,
+body.dark #root .text-gray-500,
+html[data-theme="dark"] #root .text-slate-700,
+html[data-theme="dark"] #root .text-slate-600,
+html[data-theme="dark"] #root .text-slate-500 {
+  color: var(--app-text-muted) !important;
+}
+
+html.dark #root [class~="border-slate-100"],
+html.dark #root [class~="border-slate-200"],
+html.dark #root [class~="border-slate-300"],
+body.dark #root [class~="border-slate-100"],
+body.dark #root [class~="border-slate-200"],
+body.dark #root [class~="border-slate-300"],
+html[data-theme="dark"] #root [class~="border-slate-100"],
+html[data-theme="dark"] #root [class~="border-slate-200"],
+html[data-theme="dark"] #root [class~="border-slate-300"] {
+  border-color: var(--app-border) !important;
+}
+
+html.dark #root input,
+html.dark #root select,
+html.dark #root textarea,
+body.dark #root input,
+body.dark #root select,
+body.dark #root textarea,
+html[data-theme="dark"] #root input,
+html[data-theme="dark"] #root select,
+html[data-theme="dark"] #root textarea {
+  background-color: var(--app-surface-muted);
+  color: var(--app-text);
+  border-color: var(--app-border);
+}
+
+html.dark #root table,
+body.dark #root table,
+html[data-theme="dark"] #root table,
+body[data-theme="dark"] #root table {
+  color: var(--app-text);
+}
+
+html.dark #root thead,
+html.dark #root th,
+body.dark #root thead,
+body.dark #root th,
+html[data-theme="dark"] #root thead,
+html[data-theme="dark"] #root th {
+  background-color: var(--app-surface-raised) !important;
+  color: var(--app-text) !important;
+}
+
+html.dark #root td,
+body.dark #root td,
+html[data-theme="dark"] #root td {
+  border-color: var(--app-border);
 }
 
 /* Hide scrollbar utility */
@@ -34,43 +243,33 @@ body,
   scrollbar-width: none;
 }
 
-/* Glassmorphism helpers - Optimized for 60fps rendering */
+/* Existing glass utility names now resolve to solid surfaces for compatibility. */
 .glass-panel {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
-  border: 1px solid rgba(255, 255, 255, 0.8);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.05);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  box-shadow: none;
 }
-
 .glass-card {
-  background: rgba(255, 255, 255, 0.85);
-  border: 1px solid rgba(255, 255, 255, 0.85);
-  box-shadow: 0 4px 16px rgba(15, 23, 42, 0.04);
+  background: var(--app-surface);
+  border: 1px solid var(--app-border);
+  box-shadow: none;
 }
-
 .glass-sidebar {
-  background: rgba(255, 255, 255, 0.7);
-  backdrop-filter: blur(16px) saturate(130%);
-  -webkit-backdrop-filter: blur(16px) saturate(130%);
-  border-right: 1px solid rgba(255, 255, 255, 0.75);
+  background: var(--app-surface);
+  border-right: 1px solid var(--app-border);
 }
-
 .glass-topbar {
-  background: rgba(255, 255, 255, 0.72);
-  backdrop-filter: blur(14px) saturate(130%);
-  -webkit-backdrop-filter: blur(14px) saturate(130%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.72);
+  background: var(--app-surface);
+  border-bottom: 1px solid var(--app-border);
 }
 
 /* Calendar & Event Card Performance Containment */
 .calendar-containment {
   contain: layout paint;
 }
-
 .event-card-containment {
   contain: paint;
-  transition: transform 120ms ease, box-shadow 120ms ease;
+  transition: border-color 120ms ease;
 }
 
 /* Custom subtle scrollbar */
@@ -83,7 +282,7 @@ body,
 }
 ::-webkit-scrollbar-thumb {
   background: #cbd5e1;
-  border-radius: 9999px;
+  border-radius: 2px;
 }
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
@@ -103,13 +302,12 @@ body,
     print-color-adjust: exact !important;
   }
 
-  /* Hide app layout elements when printing */
   header,
   nav,
   aside,
   .glass-sidebar,
   .glass-topbar,
-  .print\:hidden {
+  .print\\:hidden {
     display: none !important;
   }
 
@@ -131,4 +329,3 @@ body,
     page-break-inside: avoid !important;
   }
 }
-
