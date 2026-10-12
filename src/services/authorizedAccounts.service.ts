@@ -202,6 +202,7 @@ export const authorizedAccountsService = {
     role: 'ADMIN' | 'DOSEN';
     lecturerId?: string | null;
     fullName?: string;
+    temporaryPassword?: string;
   }): Promise<{
     email: string;
     temporaryPassword: string;
@@ -219,6 +220,9 @@ export const authorizedAccountsService = {
     if (payload.role === 'DOSEN' && !payload.lecturerId) {
       throw new Error('Dosen pengampu wajib dipilih.');
     }
+    if (payload.role === 'DOSEN' && (!payload.temporaryPassword || payload.temporaryPassword.length < 8 || payload.temporaryPassword.length > 72)) {
+      throw new Error('Kata sandi sementara dosen wajib diisi (8–72 karakter).');
+    }
 
     try {
       const { data, error } = await supabase.functions.invoke('admin-create-account', {
@@ -227,6 +231,7 @@ export const authorizedAccountsService = {
           full_name: payload.fullName || (payload.role === 'ADMIN' ? 'Administrator' : 'Dosen'),
           role: payload.role,
           lecturer_id: payload.lecturerId || null,
+          ...(payload.role === 'DOSEN' ? { temporary_password: payload.temporaryPassword } : {}),
         }
       });
 
@@ -359,11 +364,12 @@ export const authorizedAccountsService = {
     });
   },
 
-  async addLecturerAccount(email: string, lecturerId: string) {
+  async addLecturerAccount(email: string, lecturerId: string, temporaryPassword: string) {
     return this.createAccount({
       email,
       role: 'DOSEN',
       lecturerId,
+      temporaryPassword,
     });
   },
 
