@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { AlertTriangle, KeyRound } from 'lucide-react';
 import { AppSidebar } from './AppSidebar';
@@ -18,6 +18,33 @@ export const AppLayout: React.FC = () => {
 
   const configured = isSupabaseConfigured();
   const { isOwnerAdmin } = useAuth();
+
+  useEffect(() => {
+    const root = document.documentElement;
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+    const applyTheme = () => {
+      let preference = 'LIGHT';
+      try {
+        preference = localStorage.getItem('spk:theme') || 'LIGHT';
+      } catch {
+        // Use light mode when storage is unavailable.
+      }
+
+      const isDark = preference === 'SYSTEM' && media.matches;
+      root.classList.toggle('dark', isDark);
+      root.dataset.theme = isDark ? 'dark' : 'light';
+    };
+
+    applyTheme();
+    window.addEventListener('spk-theme-change', applyTheme);
+    media.addEventListener('change', applyTheme);
+
+    return () => {
+      window.removeEventListener('spk-theme-change', applyTheme);
+      media.removeEventListener('change', applyTheme);
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col text-slate-800 relative">
