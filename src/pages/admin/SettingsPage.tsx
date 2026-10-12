@@ -87,9 +87,10 @@ export const SettingsPage: React.FC = () => {
     setAppTheme(val);
     try {
       localStorage.setItem('spk:theme', val);
+      window.dispatchEvent(new Event('spk-theme-change'));
       toast.success(`Tema aplikasi diatur ke: ${val === 'LIGHT' ? 'Terang' : 'Sistem'}`);
     } catch {
-      // Ignore
+      window.dispatchEvent(new Event('spk-theme-change'));
     }
   };
 
