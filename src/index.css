@@ -5,6 +5,11 @@
  * CoolAdmin-inspired: flat surfaces, crisp borders, restrained blue accents.
  */
 @theme {
+  --color-blue-50: #eff6ff;
+  --color-blue-100: #dbeafe;
+  --color-blue-500: #3478f6;
+  --color-blue-600: #2563eb;
+  --color-blue-700: #1d4ed8;
   --radius-xs: 2px;
   --radius-sm: 2px;
   --radius-md: 3px;
@@ -141,15 +146,122 @@ html.dark #root .bg-slate-50,
 html.dark #root .bg-slate-100,
 html.dark #root .bg-gray-50,
 html.dark #root .bg-gray-100,
+html.dark #root .bg-slate-200,
+html.dark #root .bg-gray-200,
 body.dark #root .bg-slate-50,
 body.dark #root .bg-slate-100,
 body.dark #root .bg-gray-50,
 body.dark #root .bg-gray-100,
+body.dark #root .bg-slate-200,
+body.dark #root .bg-gray-200,
 html[data-theme="dark"] #root .bg-slate-50,
 html[data-theme="dark"] #root .bg-slate-100,
 html[data-theme="dark"] #root .bg-gray-50,
-html[data-theme="dark"] #root .bg-gray-100 {
+html[data-theme="dark"] #root .bg-gray-100,
+html[data-theme="dark"] #root .bg-slate-200,
+html[data-theme="dark"] #root .bg-gray-200,
+body[data-theme="dark"] #root .bg-slate-50,
+body[data-theme="dark"] #root .bg-slate-100,
+body[data-theme="dark"] #root .bg-gray-50,
+body[data-theme="dark"] #root .bg-gray-100 {
   background-color: var(--app-surface-muted) !important;
+}
+
+/* Accent and status colors are consistent and remain readable on dark surfaces. */
+html.dark #root .bg-blue-50,
+body.dark #root .bg-blue-50,
+html[data-theme="dark"] #root .bg-blue-50,
+body[data-theme="dark"] #root .bg-blue-50 {
+  background-color: var(--app-primary-soft) !important;
+}
+html.dark #root .bg-blue-100,
+body.dark #root .bg-blue-100,
+html[data-theme="dark"] #root .bg-blue-100,
+body[data-theme="dark"] #root .bg-blue-100 {
+  background-color: #243756 !important;
+}
+html.dark #root .text-blue-700,
+html.dark #root .text-blue-600,
+body.dark #root .text-blue-700,
+body.dark #root .text-blue-600,
+html[data-theme="dark"] #root .text-blue-700,
+html[data-theme="dark"] #root .text-blue-600,
+body[data-theme="dark"] #root .text-blue-700,
+body[data-theme="dark"] #root .text-blue-600 {
+  color: #9bbcff !important;
+}
+html.dark #root [class~="border-blue-100"],
+html.dark #root [class~="border-blue-200"],
+body.dark #root [class~="border-blue-100"],
+body.dark #root [class~="border-blue-200"],
+html[data-theme="dark"] #root [class~="border-blue-100"],
+html[data-theme="dark"] #root [class~="border-blue-200"] {
+  border-color: #35517b !important;
+}
+
+html.dark #root .bg-emerald-50,
+body.dark #root .bg-emerald-50,
+html[data-theme="dark"] #root .bg-emerald-50 {
+  background-color: #14332c !important;
+}
+html.dark #root .text-emerald-700,
+html.dark #root .text-emerald-800,
+body.dark #root .text-emerald-700,
+body.dark #root .text-emerald-800,
+html[data-theme="dark"] #root .text-emerald-700,
+html[data-theme="dark"] #root .text-emerald-800 {
+  color: #6ee7b7 !important;
+}
+html.dark #root .bg-amber-50,
+body.dark #root .bg-amber-50,
+html[data-theme="dark"] #root .bg-amber-50 {
+  background-color: #382b16 !important;
+}
+html.dark #root .text-amber-700,
+html.dark #root .text-amber-800,
+html.dark #root .text-amber-900,
+body.dark #root .text-amber-700,
+body.dark #root .text-amber-800,
+body.dark #root .text-amber-900,
+html[data-theme="dark"] #root .text-amber-700,
+html[data-theme="dark"] #root .text-amber-800,
+html[data-theme="dark"] #root .text-amber-900 {
+  color: #fcd34d !important;
+}
+html.dark #root .bg-rose-50,
+html.dark #root .bg-red-50,
+body.dark #root .bg-rose-50,
+body.dark #root .bg-red-50,
+html[data-theme="dark"] #root .bg-rose-50,
+html[data-theme="dark"] #root .bg-red-50 {
+  background-color: #3a2029 !important;
+}
+html.dark #root .text-rose-700,
+html.dark #root .text-rose-800,
+html.dark #root .text-red-700,
+body.dark #root .text-rose-700,
+body.dark #root .text-rose-800,
+body.dark #root .text-red-700,
+html[data-theme="dark"] #root .text-rose-700,
+html[data-theme="dark"] #root .text-rose-800,
+html[data-theme="dark"] #root .text-red-700 {
+  color: #fda4af !important;
+}
+html.dark #root .bg-purple-50,
+body.dark #root .bg-purple-50,
+html[data-theme="dark"] #root .bg-purple-50 {
+  background-color: #2f2442 !important;
+}
+html.dark #root .text-purple-700,
+html.dark #root .text-purple-800,
+html.dark #root .text-purple-900,
+body.dark #root .text-purple-700,
+body.dark #root .text-purple-800,
+body.dark #root .text-purple-900,
+html[data-theme="dark"] #root .text-purple-700,
+html[data-theme="dark"] #root .text-purple-800,
+html[data-theme="dark"] #root .text-purple-900 {
+  color: #d8b4fe !important;
 }
 
 html.dark #root .text-slate-900,
