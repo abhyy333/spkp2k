@@ -115,9 +115,11 @@ body,
 }
 
 /* Retain compatibility with existing Tailwind card markup while flattening cards. */
-#root .bg-white.rounded-xl.border,
-#root .bg-white.rounded-2xl.border,
-#root .bg-white.rounded-lg.border,
+#root .bg-white.rounded-xl,
+#root .bg-white.rounded-2xl,
+#root .bg-white.rounded-lg,
+#root .bg-slate-50.rounded-xl.border,
+#root .bg-slate-50.rounded-2xl.border,
 #root .glass-card,
 #root .glass-panel {
   border-radius: 2px !important;
