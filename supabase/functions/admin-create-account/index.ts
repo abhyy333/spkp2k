@@ -58,6 +58,59 @@ Deno.serve(async (req) => {
   try { payload = await req.json(); }
   catch { return json({ code: 'INVALID_BODY' }, 400); }
 
+  // Change the login email of an EXISTING lecturer without creating a new account.
+  if (payload?.action === 'UPDATE_LECTURER_EMAIL') {
+    const lecturerId = String(payload?.lecturer_id || '').trim();
+    const newEmail = String(payload?.email || '').trim().toLowerCase();
+    if (!lecturerId || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(newEmail) || newEmail.endsWith('.local')) {
+      return json({code:'INVALID_EMAIL'},400);
+    }
+    const {data:callerProfile}=await admin.from('profiles')
+      .select('role,is_active').eq('id',caller.id).maybeSingle();
+    if(callerProfile?.role!=='ADMIN'||callerProfile.is_active===false) return json({code:'FORBIDDEN'},403);
+
+    const {data:account,error:accountError}=await admin.from('authorized_accounts')
+      .select('email,role,user_id').eq('lecturer_id',lecturerId).maybeSingle();
+    if(accountError||!account||account.role!=='DOSEN') return json({code:'ACCOUNT_NOT_FOUND'},404);
+    const oldEmail=String(account.email).toLowerCase();
+    if(newEmail===oldEmail) return json({code:'SAME_EMAIL'},409);
+    const {data:duplicate}=await admin.from('authorized_accounts')
+      .select('email').ilike('email',newEmail).maybeSingle();
+    if(duplicate) return json({code:'EMAIL_ALREADY_EXISTS'},409);
+
+    if(account.user_id){
+      if(account.user_id===caller.id) return json({code:'SELF_CHANGE_FORBIDDEN'},403);
+      const {data:existingUser}=await admin.auth.admin.getUserById(account.user_id);
+      if(existingUser?.user?.email?.toLowerCase()!==oldEmail) return json({code:'AUTH_ACCOUNT_MISMATCH'},409);
+      const {error:changeError}=await admin.auth.admin.updateUserById(account.user_id,{
+        email:newEmail,email_confirm:true
+      });
+      if(changeError) return json({code:'AUTH_EMAIL_UPDATE_FAILED',message:changeError.message},409);
+    }
+
+    const {data:updated,error:updateError}=await admin.from('authorized_accounts')
+      .update({email:newEmail,updated_at:new Date().toISOString()})
+      .eq('lecturer_id',lecturerId).eq('email',account.email)
+      .select('email').maybeSingle();
+    if(updateError||!updated){
+      if(account.user_id){
+        const reverted=await admin.auth.admin.updateUserById(account.user_id,{
+          email:oldEmail,email_confirm:true
+        });
+        if(reverted.error) console.error('Rollback email failed',reverted.error);
+      }
+      return json({code:'EMAIL_UPDATE_FAILED'},500);
+    }
+
+    const {data:lecturer}=await admin.from('lecturers').select('email').eq('id',lecturerId).maybeSingle();
+    if(lecturer?.email?.toLowerCase()===oldEmail){
+      const {error:syncError}=await admin.from('lecturers').update({email:newEmail}).eq('id',lecturerId);
+      if(syncError) console.warn('Lecturer contact email sync failed',syncError);
+    }
+
+    return json({success:true,email:newEmail,role:'DOSEN'});
+  }
+
   const lecturerId = payload?.lecturer_id ? String(payload.lecturer_id).trim() : null;
   const requestedRole = String(payload?.role ?? (lecturerId ? 'DOSEN' : 'ADMIN')).trim().toUpperCase();
   if (!['ADMIN', 'DOSEN'].includes(requestedRole)) return json({ code: 'INVALID_ROLE' }, 400);
@@ -94,11 +147,17 @@ Deno.serve(async (req) => {
     if (linkedAccount?.user_id) return json({ code: 'LECTURER_ALREADY_LINKED' }, 409);
 
     email = String(payload?.email ?? '').trim().toLowerCase();
-    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.endsWith('@auth.spkjte.local') || email.endsWith('.local')) {
+    if (!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(email) || email.endsWith('@auth.spkjte.local') || email.endsWith('.local')) {
       return json({ code: 'INVALID_EMAIL', message: 'Masukkan email login yang valid.' }, 400);
     }
     fullName = String(lecturer.name ?? '').trim();
-    temporaryPassword = randomPassword();
+    temporaryPassword = String(payload?.temporary_password ?? '');
+    if (temporaryPassword.length < 8 || temporaryPassword.length > 72) {
+      return json({
+        code: 'INVALID_TEMPORARY_PASSWORD',
+        message: 'Kata sandi sementara harus berisi 8–72 karakter.',
+      }, 400);
+    }
   } else {
     email = String(payload?.email ?? '').trim().toLowerCase();
     fullName = String(payload?.full_name ?? '').trim();
